@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 // src/redis.js
 import redis from './redisClient.js';
-
+//teste
 // Função para testar o Redis
 (async () => {
     try {
