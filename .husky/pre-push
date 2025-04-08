@@ -1,6 +1,3 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
 BRANCH_NAME=$(git symbolic-ref --short HEAD)
 
 if [ "$BRANCH_NAME" = "main" ]; then
