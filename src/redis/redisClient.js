@@ -1,12 +1,16 @@
+/* eslint-disable no-console */
 import Redis from 'ioredis';
-const redis = new Redis({ host: "127.0.0.1", port: 6000 });
+
+const redis = new Redis({ host: '127.0.0.1', port: 6000 });
 
 redis.on('connect', () => {
-  console.log('✅ Redis conectado!');
+    console.log('✅ Redis conectado!');
 });
 
 redis.on('error', (err) => {
-  console.error('❌ Erro no Redis:', err);
+    console.error('❌ Erro no Redis:', err);
 });
+
+// TODO: Change console.log to logger
 
 export default redis;

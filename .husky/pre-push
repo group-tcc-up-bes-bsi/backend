@@ -1,0 +1,11 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+BRANCH_NAME=$(git symbolic-ref --short HEAD)
+
+if [ "$BRANCH_NAME" = "main" ]; then
+    echo "🚫 Push para 'main' bloqueado! Faça um PR em vez disso."
+    exit 1
+fi
+
+npm run test

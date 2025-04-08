@@ -12,11 +12,12 @@
   },
   "scripts": {
     "install:dev": "rm -rf ./node_modules && npm install",
-    "install:prod": "npm install --production && npm install ioredis",
+    "install:prod": "rm -rf ./node_modules && npm install --production",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "prepare": "husky",
     "start": "node src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"Error: no test specified\"",
     "redis": "node src/redis/exemplo.js"
   },
   "dependencies": {
@@ -31,6 +32,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-jsdoc": "^50.6.9",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0"
   }
 }
