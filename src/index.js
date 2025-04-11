@@ -22,7 +22,6 @@ app.get('/users', (req, res) => {
             logger.error('Erro ao consultar usuários:', err);
             return res.status(500).json({ error: 'Erro ao consultar usuários' });
         }
-
         res.json(results);
     });
 });
