@@ -12,7 +12,7 @@
   },
   "scripts": {
     "install:dev": "rm -rf ./node_modules && npm install",
-    "install:prod": "rm -rf ./node_modules && npm install --production",
+    "install:prod": "rm -rf ./node_modules && npm install --omit=dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare": "husky",

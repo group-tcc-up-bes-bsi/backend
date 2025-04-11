@@ -31,6 +31,7 @@ module.exports = {
             js: 'always',
             mjs: 'always',
             jsx: 'always'
-        }]
+        }],
+        'consistent-return': 'off',
     },
 };
