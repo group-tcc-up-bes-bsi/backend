@@ -1,8 +1,8 @@
 {
-    "recommendations": [
-        "ms-vscode-remote.vscode-remote-extensionpack",
-        "dbaeumer.vscode-eslint",
-        "orta.vscode-jest",
-        "gruntfuggly.todo-tree"
-    ]
+  "recommendations": [
+    "ms-vscode-remote.vscode-remote-extensionpack",
+    "dbaeumer.vscode-eslint",
+    "orta.vscode-jest",
+    "gruntfuggly.todo-tree"
+  ]
 }
