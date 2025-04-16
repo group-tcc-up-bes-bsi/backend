@@ -1,8 +1,8 @@
 BRANCH_NAME=$(git symbolic-ref --short HEAD)
 
-if [ "$BRANCH_NAME" = "main" ]; then
-    echo "Push para 'main' bloqueado! Crie um branch e abra um PR para o 'main'."
+if [ "$BRANCH_NAME" = "master" ]; then
+    echo "Push para 'master' bloqueado! Crie um branch e abra um PR para o 'master'."
     exit 1
 fi
 
-npm run test:all
+npm run test:ci
