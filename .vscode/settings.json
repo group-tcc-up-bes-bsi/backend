@@ -1,4 +1,3 @@
 {
-    "jest.jestCommandLine": "npx jest --config test/jestCfg/jest-all.json",
     "jest.runMode": "on-demand"
 }
