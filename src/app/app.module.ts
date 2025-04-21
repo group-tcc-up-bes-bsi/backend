@@ -5,7 +5,6 @@ import { AuthModule } from 'src/auth/auth.module';
 import { UsersModule } from 'src/users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { UsersEntity } from 'src/users/users.entity';
 import * as crypto from 'crypto';
 
 globalThis.crypto = {
@@ -25,14 +24,14 @@ globalThis.crypto = {
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'mysql',
-        // Getting these configurations from .env file.
         host: config.get('DB_HOST'),
         port: parseInt(config.get('DB_PORT'), 10),
+        database: config.get('DB_DATABASE'),
         username: config.get('DB_USERNAME'),
         password: config.get('DB_PASSWORD'),
-        database: config.get('DB_NAME'),
-        entities: [UsersEntity],
-        synchronize: true,
+        entities: [__dirname + '/../**/*.entity{.ts,.js}'], // Imports dinamically all entities.
+        autoLoadEntities: true,
+        synchronize: true, // FIXME: Set to false in production
       }),
     }),
     UsersModule,

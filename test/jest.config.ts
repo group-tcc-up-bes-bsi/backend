@@ -16,6 +16,8 @@ const config: Config = {
   moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths ?? {}, {
     prefix: '<rootDir>/../',
   }),
+  globalSetup: './jest-global-setup.ts',
+  globalTeardown: './jest-global-teardown.ts',
 };
 
 export default config;

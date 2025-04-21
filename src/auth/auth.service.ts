@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { User, UsersService } from 'src/users/users.service';
 
@@ -17,6 +21,11 @@ export class AuthService {
   ///////////////////////////////////////////////////////////////////////
 
   async login(input: AuthInput): Promise<AuthOutput | null> {
+    // Sanity check
+    if (!input.username || !input.password) {
+      throw new BadRequestException('Username and password are required');
+    }
+
     const user = await this.usersService.findByUsername(input.username);
 
     if (!user) {
