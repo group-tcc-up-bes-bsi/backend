@@ -57,7 +57,7 @@
             "args": [
                 "--runInBand",
                 "--config",
-                "./test/jest-e2e.json"
+                "./test/jest.config.ts"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -75,7 +75,7 @@
             "args": [
                 "--runInBand",
                 "--config",
-                "./test/jest-e2e.json",
+                "./test/jest.config.ts",
                 "${fileBasenameNoExtension}"
             ],
             "cwd": "${workspaceFolder}",
