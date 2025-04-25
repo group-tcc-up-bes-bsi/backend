@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UsersEntity } from './entity/users.entity';
 import { Repository } from 'typeorm';
@@ -31,8 +37,13 @@ export class UsersService {
     return this.usersRepo.find();
   }
 
-  findOne(userId: number) {
-    return this.usersRepo.findOneBy({ userId });
+  async findOne(userId: number) {
+    const user = await this.usersRepo.findOneBy({ userId });
+    if (user) {
+      return user;
+    }
+    this.logger.warn(`User with ID ${userId} not found`);
+    throw new NotFoundException('User not found');
   }
 
   async create(dto: CreateUserDto): Promise<UsersEntity> {
@@ -54,18 +65,31 @@ export class UsersService {
   }
 
   async update(userId: number, dto: UpdateUserDto) {
+    if (Object.keys(dto).length === 0) {
+      this.logger.warn(`No data provided for update userId ${userId}`);
+      throw new BadRequestException('No data provided for update');
+    }
+
     try {
       const result = await this.usersRepo.update(userId, dto);
       if (result.affected > 0) {
         this.logger.log(`User with ID ${userId} successfully updated`);
-        return this.findOne(userId);
+        const updatedUser = await this.findOne(userId);
+        return {
+          userId: updatedUser.userId,
+          username: updatedUser.username,
+          email: updatedUser.email,
+        };
       } else {
         this.logger.warn(`No user found with ID ${userId} to update`);
-        return null;
+        throw new NotFoundException('User not found');
       }
     } catch (e) {
+      if (e.name === 'NotFoundException') {
+        throw e;
+      }
       this.logger.error(`Error updating user with ID ${userId}`, e.stack);
-      throw e;
+      throw new Error('Error updating user');
     }
   }
 
@@ -78,11 +102,11 @@ export class UsersService {
         return user;
       } catch (e) {
         this.logger.error(`Error removing user with ID ${userId}`, e.stack);
-        throw e;
+        throw new Error('Error deleting user');
       }
     } else {
       this.logger.warn(`User with ID ${userId} not found for removal`);
-      return null;
+      throw new NotFoundException('User not found');
     }
   }
 }
