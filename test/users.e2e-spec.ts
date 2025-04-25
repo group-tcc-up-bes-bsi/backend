@@ -19,6 +19,7 @@ describe('UsersController (e2e)', () => {
     await app.init();
 
     db = app.get(DataSource);
+    await db.getRepository(UsersEntity).clear();
     await db.getRepository(UsersEntity).save({
       username: 'john_doe',
       password: '123',
