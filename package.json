@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Back-End Node.js using Nest.js Framework",
   "author": "group-tcc-up-bes-bsi",
   "license": "ISC",
