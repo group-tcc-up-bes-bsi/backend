@@ -15,6 +15,16 @@ const config: Config = {
   moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths ?? {}, {
     prefix: '<rootDir>/',
   }),
+  reporters: [
+    'default',
+    [
+      'jest-html-reporter',
+      {
+        pageTitle: 'DocDash BackEnd - Unit Tests',
+        outputPath: './tests-unit-report.html',
+      },
+    ],
+  ],
 };
 
 export default config;

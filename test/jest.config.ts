@@ -18,6 +18,16 @@ const config: Config = {
   }),
   globalSetup: './jest-global-setup.ts',
   globalTeardown: './jest-global-teardown.ts',
+  reporters: [
+    'default',
+    [
+      'jest-html-reporter',
+      {
+        pageTitle: 'DocDash BackEnd - E2E Tests',
+        outputPath: './tests-e2e-report.html',
+      },
+    ],
+  ],
 };
 
 export default config;
