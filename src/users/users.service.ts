@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UsersEntity } from './entity/users.entity';
 import { Repository } from 'typeorm';
@@ -44,8 +44,12 @@ export class UsersService {
       );
       return savedUser;
     } catch (e) {
+      if (e.sqlMessage.includes('Duplicate entry')) {
+        this.logger.warn(`User with username ${dto.username} already exists`);
+        throw new ConflictException('User already exists');
+      }
       this.logger.error('Error creating user', e.stack);
-      throw e;
+      throw new Error('Error creating user');
     }
   }
 
