@@ -418,13 +418,13 @@ describe('UsersController (e2e)', () => {
         });
     });
 
-    it('User not found', () => {
+    it('Email not found', () => {
       return request(app.getHttpServer())
         .delete('/users/11111')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404)
         .expect((res) => {
-          expect(res.body.message).toBe('User not found');
+          expect(res.body.message).toBe('Email not found');
         });
     });
   });
