@@ -29,7 +29,7 @@ describe('UsersController (e2e)', () => {
     authToken = (
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'john_doe', password: '123' })
+        .send({ email: 'test@example.com', password: '123' })
     ).body.token;
   });
 
@@ -418,13 +418,13 @@ describe('UsersController (e2e)', () => {
         });
     });
 
-    it('Email not found', () => {
+    it('User not found', () => {
       return request(app.getHttpServer())
         .delete('/users/11111')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404)
         .expect((res) => {
-          expect(res.body.message).toBe('Email not found');
+          expect(res.body.message).toBe('User not found');
         });
     });
   });
