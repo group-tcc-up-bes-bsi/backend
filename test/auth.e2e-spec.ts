@@ -49,7 +49,7 @@ describe('AuthController (e2e)', () => {
         .send({ email: 'random', password: 'invalid' })
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('Invalid username');
+          expect(res.body.message).toBe('Invalid email');
         });
     });
 
