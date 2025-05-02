@@ -5,10 +5,11 @@ module.exports = {
     tsconfigRootDir: __dirname,
     sourceType: 'module',
   },
-  plugins: ['@typescript-eslint/eslint-plugin'],
+  plugins: ['@typescript-eslint/eslint-plugin', 'jsdoc'],
   extends: [
     'plugin:@typescript-eslint/recommended',
     'plugin:prettier/recommended',
+    'plugin:jsdoc/recommended'
   ],
   root: true,
   env: {
@@ -20,6 +21,16 @@ module.exports = {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',     
+    'jsdoc/require-jsdoc': ['warn', {
+      'publicOnly': true,
+      'require': {
+        'ClassDeclaration': true,
+        'MethodDefinition': true,
+        'FunctionDeclaration': true,
+        'ArrowFunctionExpression': false,
+        'FunctionExpression': false
+      }
+    }]
   },
 };

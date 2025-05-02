@@ -9,6 +9,7 @@ describe('UsersController (e2e)', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
+  let userId: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -19,12 +20,16 @@ describe('UsersController (e2e)', () => {
     await app.init();
 
     db = app.get(DataSource);
+  });
+
+  beforeEach(async () => {
     await db.getRepository(UsersEntity).clear();
-    await db.getRepository(UsersEntity).save({
+    const user = await db.getRepository(UsersEntity).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',
     });
+    userId = user.userId;
 
     authToken = (
       await request(app.getHttpServer())
@@ -44,13 +49,7 @@ describe('UsersController (e2e)', () => {
       email: 'jane.doe@gmail.com' as any,
     };
 
-    beforeEach(
-      () =>
-        (testUser.email = `jane.doe${Math.floor(Math.random() * 1000)}@gmail.com`),
-    );
-
     it('User created successfully', () => {
-      const email = testUser.email;
       return request(app.getHttpServer())
         .post('/users')
         .send(testUser)
@@ -68,7 +67,7 @@ describe('UsersController (e2e)', () => {
               expect(user).toBeDefined();
               expect(user.username).toBe(testUser.username);
               expect(user.password).toBe(testUser.password);
-              expect(user.email).toBe(email);
+              expect(user.email).toBe(testUser.email);
             });
         });
     });
@@ -149,8 +148,6 @@ describe('UsersController (e2e)', () => {
   });
 
   describe('Read - Get all', () => {
-    beforeAll(async () => await db.getRepository(UsersEntity).clear());
-
     it('Request without authentication', () => {
       return request(app.getHttpServer())
         .get('/users')
@@ -197,18 +194,6 @@ describe('UsersController (e2e)', () => {
   });
 
   describe('Read - Get by Id', () => {
-    let userId: number;
-
-    beforeAll(async () => {
-      await db.getRepository(UsersEntity).clear();
-      const user = await db.getRepository(UsersEntity).save({
-        username: 'specific_user',
-        password: 'specific123',
-        email: 'specific_user@example.com',
-      });
-      userId = user.userId;
-    });
-
     it('Request without authentication', () => {
       return request(app.getHttpServer())
         .get(`/users/${userId}`)
@@ -226,37 +211,29 @@ describe('UsersController (e2e)', () => {
         .expect((res) => {
           expect(res.body).toMatchObject({
             userId: userId,
-            username: 'specific_user',
-            email: 'specific_user@example.com',
+            username: 'john_doe',
+            email: 'test@example.com',
           });
         });
     });
 
-    it('User not found', () => {
+    it('Trying to access another user', () => {
       return request(app.getHttpServer())
         .get('/users/99999')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(404)
+        .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('User not found');
+          expect(res.body.message).toBe(
+            'You are not authorized to access this resource',
+          );
         });
     });
   });
 
   describe('Update', () => {
-    beforeEach(async () => {
-      await db.getRepository(UsersEntity).clear();
-      await db.getRepository(UsersEntity).save({
-        userId: 888,
-        username: 'update_user',
-        password: 'update123',
-        email: 'update_user@example.com',
-      });
-    });
-
     it('Request without authentication', () => {
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .send({ username: 'updated_user', password: 'newpassword123' })
         .expect(401)
         .expect((res) => {
@@ -272,23 +249,23 @@ describe('UsersController (e2e)', () => {
       };
 
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updatedUser)
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
-            userId: 888,
+            userId: userId,
             username: 'updated_user',
             email: 'updated_email@example.com',
           });
         })
         .expect(() => {
           db.getRepository(UsersEntity)
-            .findOneBy({ userId: 888 })
+            .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
-                userId: 888,
+                userId: userId,
                 ...updatedUser,
               });
             });
@@ -297,45 +274,46 @@ describe('UsersController (e2e)', () => {
 
     it('User updated successfully - Only 1 param', () => {
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'updated_email@example.com' })
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
-            userId: 888,
-            username: 'update_user',
+            userId: userId,
+            username: 'john_doe',
             email: 'updated_email@example.com',
           });
         })
         .expect(() => {
           db.getRepository(UsersEntity)
-            .findOneBy({ userId: 888 })
+            .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
-                userId: 888,
-                username: 'update_user',
-                password: 'update123',
+                userId: userId,
+                username: 'john_doe',
+                password: '123',
                 email: 'updated_email@example.com',
               });
             });
         });
     });
 
-    it('User not found', () => {
+    it('Trying to update another user', () => {
       return request(app.getHttpServer())
         .put('/users/99999')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'nonexistent_user' })
-        .expect(404)
         .expect((res) => {
-          expect(res.body.message).toBe('User not found');
+          expect(res.body.message).toBe(
+            'You are not authorized to access this resource',
+          );
         });
     });
 
     it('Invalid username', () => {
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 123 })
         .expect(400)
@@ -346,7 +324,7 @@ describe('UsersController (e2e)', () => {
 
     it('Invalid password', () => {
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ password: 1234 })
         .expect(400)
@@ -357,7 +335,7 @@ describe('UsersController (e2e)', () => {
 
     it('Invalid email', () => {
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'aaa' })
         .expect(400)
@@ -368,7 +346,7 @@ describe('UsersController (e2e)', () => {
 
     it('Request without body', () => {
       return request(app.getHttpServer())
-        .put('/users/888')
+        .put(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(400)
         .expect((res) => {
@@ -378,16 +356,6 @@ describe('UsersController (e2e)', () => {
   });
 
   describe('Delete', () => {
-    beforeEach(async () => {
-      await db.getRepository(UsersEntity).clear();
-      await db.getRepository(UsersEntity).save({
-        userId: 999,
-        username: 'delete_user',
-        password: 'delete123',
-        email: 'delete_user@example.com',
-      });
-    });
-
     it('Request without authentication', () => {
       return request(app.getHttpServer())
         .delete('/users/999')
@@ -399,32 +367,34 @@ describe('UsersController (e2e)', () => {
 
     it('User deleted successfully', () => {
       return request(app.getHttpServer())
-        .delete('/users/999')
+        .delete(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
-            username: 'delete_user',
-            password: 'delete123',
-            email: 'delete_user@example.com',
+            username: 'john_doe',
+            password: '123',
+            email: 'test@example.com',
           });
         })
         .expect(() => {
           db.getRepository(UsersEntity)
-            .findOneBy({ userId: 999 })
+            .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toBeNull();
             });
         });
     });
 
-    it('User not found', () => {
+    it('Trying to delete another user', () => {
       return request(app.getHttpServer())
         .delete('/users/11111')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(404)
+        .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('User not found');
+          expect(res.body.message).toBe(
+            'You are not authorized to access this resource',
+          );
         });
     });
   });

@@ -1,6 +1,4 @@
 import { Module, ValidationPipe } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuthModule } from 'src/auth/auth.module';
 import { UsersModule } from 'src/users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -12,7 +10,10 @@ globalThis.crypto = {
   randomUUID: () => crypto.randomUUID(),
 } as Crypto;
 
-// This is the main module, all of the controllers and services are imported here.
+/**
+ * Main application module.
+ * This module imports and configures the necessary modules for the application.
+ */
 @Module({
   imports: [
     // Import and configure the NestJs configuration module.
@@ -38,9 +39,7 @@ globalThis.crypto = {
     UsersModule,
     AuthModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_PIPE,
       useClass: ValidationPipe,
