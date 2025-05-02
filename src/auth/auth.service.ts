@@ -6,8 +6,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { User, UsersService } from 'src/users/users.service';
 
-type AuthInput = { username: string; password: string };
-type AuthOutput = { token: string; user: { userId: number; username: string } };
+type AuthInput = { email: string; password: string };
+type AuthOutput = { token: string; user: { userId: number; email: string } };
 
 @Injectable()
 export class AuthService {
@@ -22,14 +22,14 @@ export class AuthService {
 
   async login(input: AuthInput): Promise<AuthOutput | null> {
     // Sanity check
-    if (!input.username || !input.password) {
-      throw new BadRequestException('Username and password are required');
+    if (!input.email || !input.password) {
+      throw new BadRequestException('email and password are required');
     }
 
-    const user = await this.usersService.findByUsername(input.username);
+    const user = await this.usersService.findByEmail(input.email);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid username');
+      throw new UnauthorizedException('Invalid email');
     }
 
     if (user.password === input.password) {
@@ -46,7 +46,7 @@ export class AuthService {
   private async signIn(user: User): Promise<AuthOutput> {
     const tokenPayload = {
       sub: user.userId,
-      username: user.username,
+      email: user.email,
     };
     const accessToken = await this.jwtService.signAsync(tokenPayload);
 
@@ -54,7 +54,7 @@ export class AuthService {
       token: accessToken,
       user: {
         userId: user.userId,
-        username: user.username,
+        email: user.username,
       },
     };
   }

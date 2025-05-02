@@ -29,7 +29,7 @@ describe('UsersController (e2e)', () => {
     authToken = (
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'john_doe', password: '123' })
+        .send({ email: 'test@example.com', password: '123' })
     ).body.token;
   });
 

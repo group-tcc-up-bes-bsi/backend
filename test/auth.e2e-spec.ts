@@ -34,29 +34,29 @@ describe('AuthController (e2e)', () => {
     it('Logged in successfully', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'john_doe', password: '123' })
+        .send({ email: 'test@example.com', password: '123' })
         .expect(200)
         .expect((res) => {
           expect(res.body.token).toBeDefined();
           expect(res.body.user.userId).toBeDefined();
-          expect(res.body.user.username).toBeDefined();
+          expect(res.body.user.email).toBeDefined();
         });
     });
 
-    it('Invalid username', () => {
+    it('Invalid email', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'random', password: 'invalid' })
+        .send({ email: 'random', password: 'invalid' })
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('Invalid username');
+          expect(res.body.message).toBe('Invalid email');
         });
     });
 
     it('Invalid password', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'john_doe', password: 'invalid' })
+        .send({ email: 'test@example.com', password: 'invalid' })
         .expect(401)
         .expect((res) => {
           expect(res.body.message).toBe('Invalid password');
@@ -66,10 +66,10 @@ describe('AuthController (e2e)', () => {
     it('Missing properties', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'john_doe' })
+        .send({ email: 'test@example.com' })
         .expect(400)
         .expect((res) => {
-          expect(res.body.message).toBe('Username and password are required');
+          expect(res.body.message).toBe('email and password are required');
         });
     });
   });
@@ -78,7 +78,7 @@ describe('AuthController (e2e)', () => {
     it('Get user info, user is authenticated', async () => {
       const loginResponse = await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'john_doe', password: '123' })
+        .send({ email: 'test@example.com', password: '123' })
         .expect(200);
       const token = loginResponse.body.token;
       return request(app.getHttpServer())
@@ -87,7 +87,7 @@ describe('AuthController (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body.userId).toBeDefined();
-          expect(res.body.username).toBe('john_doe');
+          expect(res.body.email).toBe('test@example.com');
         });
     });
 

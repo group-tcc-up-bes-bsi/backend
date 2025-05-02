@@ -18,7 +18,7 @@ export class AuthController {
   // Authenticate the user.
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() input: { username: string; password: string }) {
+  login(@Body() input: { email: string; password: string }) {
     return this.authService.login(input);
   }
 

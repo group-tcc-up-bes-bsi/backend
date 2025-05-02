@@ -12,6 +12,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 export type User = {
+  email: string;
   userId: number;
   username: string;
   password: string;
@@ -29,6 +30,13 @@ export class UsersService {
   async findByUsername(username: string): Promise<User | undefined> {
     const user = await this.usersRepo.findOne({
       where: { username },
+    });
+    return user;
+  }
+
+  async findByEmail(email: string): Promise<User | undefined> {
+    const user = await this.usersRepo.findOne({
+      where: { email },
     });
     return user;
   }
