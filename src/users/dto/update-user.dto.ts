@@ -1,5 +1,8 @@
 import { IsEmail, IsOptional, IsString } from 'class-validator';
 
+/**
+ * Data Transfer Object for updating a user.
+ */
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
@@ -11,5 +14,5 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsEmail()
-  email?: string;
+  email: string;
 }

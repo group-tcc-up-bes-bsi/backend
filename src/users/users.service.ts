@@ -18,15 +18,28 @@ export type User = {
   password: string;
 };
 
+/**
+ * Service for managing users.
+ * This service interacts with the database to perform CRUD operations on user entities.
+ */
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
+  /**
+   * Creates an instance of UsersService.
+   * @param {Repository<UsersEntity>} usersRepo - The repository for user entities.
+   */
   constructor(
     @InjectRepository(UsersEntity)
     private readonly usersRepo: Repository<UsersEntity>,
   ) {}
 
+  /**
+   * Finds a user by their username.
+   * @param {string} username - The username of the user to find.
+   * @returns {Promise<User | undefined>} - A promise that resolves to the user object if found, or undefined if not found.
+   */
   async findByUsername(username: string): Promise<User | undefined> {
     const user = await this.usersRepo.findOne({
       where: { username },
@@ -34,6 +47,11 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Finds a user by their email.
+   * @param {string} email - The email of the user to find.
+   * @returns {Promise<User | undefined>} - A promise that resolves to the user object if found, or undefined if not found.
+   */
   async findByEmail(email: string): Promise<User | undefined> {
     const user = await this.usersRepo.findOne({
       where: { email },
@@ -41,10 +59,19 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Retrieves all users.
+   * @returns {Promise<UsersEntity[]>} - A promise that resolves to an array of user entities.
+   */
   findAll() {
     return this.usersRepo.find();
   }
 
+  /**
+   * Retrieves a user by their ID.
+   * @param {number} userId - The ID of the user to retrieve.
+   * @returns {Promise<UsersEntity>} - A promise that resolves to the user entity if found.
+   */
   async findOne(userId: number) {
     const user = await this.usersRepo.findOneBy({ userId });
     if (user) {
@@ -54,6 +81,12 @@ export class UsersService {
     throw new NotFoundException('User not found');
   }
 
+  /**
+   * Creates a new user.
+   * @param {CreateUserDto} dto - The data transfer object containing user information.
+   * @returns {Promise<UsersEntity>} - A promise that resolves to the created user entity.
+   * @throws {ConflictException} - If a user with the same username or email already exists.
+   */
   async create(dto: CreateUserDto): Promise<UsersEntity> {
     const user = this.usersRepo.create(dto);
     try {
@@ -72,6 +105,15 @@ export class UsersService {
     }
   }
 
+  /**
+   * Updates an existing user.
+   * @param {number} userId - The ID of the user to update.
+   * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
+   * @returns {Promise<UsersEntity>} - A promise that resolves to the updated user entity.
+   * @throws {BadRequestException} - If no data is provided for update.
+   * @throws {NotFoundException} - If the user with the specified ID does not exist.
+   * @throws {ConflictException} - If a user with the same username or email already exists.
+   */
   async update(userId: number, dto: UpdateUserDto) {
     if (Object.keys(dto).length === 0) {
       this.logger.warn(`No data provided for update userId ${userId}`);
@@ -96,11 +138,31 @@ export class UsersService {
       if (e.name === 'NotFoundException') {
         throw e;
       }
+
+      if (e.sqlMessage.includes('Duplicate entry')) {
+        if (e.query.includes('username')) {
+          this.logger.warn(`User with username ${dto.username} already exists`);
+          throw new ConflictException('User already exists');
+        } else if (e.query.includes('email')) {
+          this.logger.warn(`User with email ${dto.email} already exists`);
+          throw new ConflictException('Email already exists');
+        } else {
+          this.logger.error(`Unexpected error: ${e.message}`);
+          throw new Error('Unexpected error');
+        }
+      }
+
       this.logger.error(`Error updating user with ID ${userId}`, e.stack);
       throw new Error('Error updating user');
     }
   }
 
+  /**
+   * Removes a user by their ID.
+   * @param {number} userId - The ID of the user to remove.
+   * @returns {Promise<UsersEntity>} - A promise that resolves to the removed user entity.
+   * @throws {NotFoundException} - If the user with the specified ID does not exist.
+   */
   async remove(userId: number) {
     const user = await this.findOne(userId);
     if (user) {

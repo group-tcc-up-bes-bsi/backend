@@ -5,6 +5,9 @@ import { UsersModule } from 'src/users/users.module'; // Não alterar esse impor
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
+/**
+ * Module for managing authentication.
+ */
 @Module({
   imports: [
     ConfigModule,
