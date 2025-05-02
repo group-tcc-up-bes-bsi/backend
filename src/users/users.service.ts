@@ -96,6 +96,20 @@ export class UsersService {
       if (e.name === 'NotFoundException') {
         throw e;
       }
+
+      if (e.sqlMessage.includes('Duplicate entry')) {
+        if (e.query.includes('username')) {
+          this.logger.warn(`User with username ${dto.username} already exists`);
+          throw new ConflictException('User already exists');
+        } else if (e.query.includes('email')) {
+          this.logger.warn(`User with email ${dto.email} already exists`);
+          throw new ConflictException('Email already exists');
+        } else {
+          this.logger.error(`Unexpected error: ${e.message}`);
+          throw new Error('Unexpected error');
+        }
+      }
+
       this.logger.error(`Error updating user with ID ${userId}`, e.stack);
       throw new Error('Error updating user');
     }

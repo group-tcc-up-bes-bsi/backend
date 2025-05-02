@@ -9,6 +9,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
+  Request,
+  Logger,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
@@ -17,6 +20,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+
   constructor(private readonly usersService: UsersService) {}
 
   // FIXME: Only administrators should be able to access this endpoint
@@ -26,10 +31,17 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  // TODO: Protection to only allow the user to see their own data
   @UseGuards(AuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: number) {
+  findOne(@Param('id') id: number, @Request() request) {
+    if (request.user.userId !== Number(id)) {
+      this.logger.warn(
+        `User with ID ${request.user.userId} tried to access user with ID ${id}`,
+      );
+      throw new UnauthorizedException(
+        'You are not authorized to access this resource',
+      );
+    }
     return this.usersService.findOne(id);
   }
 
