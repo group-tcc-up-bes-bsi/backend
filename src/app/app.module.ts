@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { APP_PIPE } from '@nestjs/core';
+import { DocumentsModule } from 'src/documents/documents.module';
 
 globalThis.crypto = {
   randomUUID: () => crypto.randomUUID(),
@@ -34,10 +35,12 @@ globalThis.crypto = {
         entities: [__dirname + '/../**/*.entity{.ts,.js}'], // Imports dinamically all entities.
         autoLoadEntities: true,
         synchronize: true, // FIXME: Set to false in production
+        timezone: 'Z',
       }),
     }),
     UsersModule,
     AuthModule,
+    DocumentsModule,
   ],
   providers: [
     {

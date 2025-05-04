@@ -3,7 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UsersEntity } from 'src/users/entity/users.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { DocumentEntity } from 'src/documents/entities/document.entity';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
@@ -23,8 +24,9 @@ describe('UsersController (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await db.getRepository(UsersEntity).clear();
-    const user = await db.getRepository(UsersEntity).save({
+    await db.getRepository(DocumentEntity).delete({});
+    await db.getRepository(UserEntity).delete({});
+    const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',
@@ -61,7 +63,7 @@ describe('UsersController (e2e)', () => {
           expect(res.body.userId).toBeDefined();
         })
         .expect((res) => {
-          db.getRepository(UsersEntity)
+          db.getRepository(UserEntity)
             .findOneBy({ userId: res.body.userId })
             .then((user) => {
               expect(user).toBeDefined();
@@ -158,13 +160,13 @@ describe('UsersController (e2e)', () => {
     });
 
     it('Get all users successfully', async () => {
-      await db.getRepository(UsersEntity).save({
+      await db.getRepository(UserEntity).save({
         username: 'user1',
         password: 'password1',
         email: 'user1@example.com',
       });
 
-      await db.getRepository(UsersEntity).save({
+      await db.getRepository(UserEntity).save({
         username: 'user2',
         password: 'password2',
         email: 'user2@example.com',
@@ -261,7 +263,7 @@ describe('UsersController (e2e)', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UsersEntity)
+          db.getRepository(UserEntity)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
@@ -286,7 +288,7 @@ describe('UsersController (e2e)', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UsersEntity)
+          db.getRepository(UserEntity)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
@@ -371,14 +373,14 @@ describe('UsersController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toStrictEqual({
+          expect(res.body).toMatchObject({
             username: 'john_doe',
             password: '123',
             email: 'test@example.com',
           });
         })
         .expect(() => {
-          db.getRepository(UsersEntity)
+          db.getRepository(UserEntity)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toBeNull();

@@ -47,16 +47,16 @@ export class UsersController {
   /**
    * Retrieves a user by their ID.
    * Only the user themselves can access this endpoint.
-   * @param {number} id - The ID of the user to retrieve.
+   * @param {string} id - The ID of the user to retrieve.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the user object.
    * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: number, @Request() request) {
-    this.checkUserAccess(id, request);
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @Request() request) {
+    this.checkUserAccess(+id, request);
+    return this.usersService.findOne(+id);
   }
 
   /**
@@ -73,7 +73,7 @@ export class UsersController {
   /**
    * Updates an existing user.
    * Only the user themselves can access this endpoint.
-   * @param {number} id - The ID of the user to update.
+   * @param {string} id - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the updated user object.
@@ -82,27 +82,27 @@ export class UsersController {
   @UseGuards(AuthGuard)
   @Put(':id')
   update(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Body() dto: UpdateUserDto,
     @Request() request,
   ) {
-    this.checkUserAccess(id, request);
-    return this.usersService.update(id, dto);
+    this.checkUserAccess(+id, request);
+    return this.usersService.update(+id, dto);
   }
 
   /**
    * Deletes a user by their ID.
    * Only the user themselves can access this endpoint.
-   * @param {number} id - The ID of the user to delete.
+   * @param {string} id - The ID of the user to delete.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the deleted user object.
    * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
   @Delete(':id')
-  remove(@Param('id') id: number, @Request() request) {
-    this.checkUserAccess(id, request);
-    return this.usersService.remove(id);
+  remove(@Param('id') id: string, @Request() request) {
+    this.checkUserAccess(+id, request);
+    return this.usersService.remove(+id);
   }
 
   /**
@@ -113,7 +113,7 @@ export class UsersController {
    * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
    */
   private checkUserAccess(id: number, @Request() request) {
-    if (Number(request.user.userId) !== Number(id)) {
+    if (+request.user.userId !== id) {
       this.logger.warn(
         `User with ID ${request.user.userId} tried to access user with ID ${id}`,
       );
