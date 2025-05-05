@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -33,6 +35,7 @@ export class DocumentsController {
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the created document object.
    */
+  @HttpCode(HttpStatus.CREATED)
   @Post()
   create(@Body() createDocumentDto: CreateDocumentDto, @Request() request) {
     if (!createDocumentDto.userId) {

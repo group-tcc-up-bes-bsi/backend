@@ -4,9 +4,8 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { DocumentEntity } from 'src/documents/entities/document.entity';
 
-describe('UsersController (e2e)', () => {
+describe('Users Controller (e2e)', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
@@ -24,7 +23,6 @@ describe('UsersController (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await db.getRepository(DocumentEntity).delete({});
     await db.getRepository(UserEntity).delete({});
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',

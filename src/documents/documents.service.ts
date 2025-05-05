@@ -32,7 +32,7 @@ export class DocumentsService {
   /**
    * Creates a new document.
    * @param {CreateDocumentDto} createDocumentDto - The data transfer object containing document details.
-   * @returns {string} - A message indicating the action performed.
+   * @returns {object} - Object containing message and documentId.
    * @throws {NotFoundException} - If the user is not found.
    * @throws {Error} - If an error occurs during the save process.
    */
@@ -48,9 +48,12 @@ export class DocumentsService {
 
     return this.documentsRepo
       .save(this.documentsRepo.create({ ...rest, owner: user }))
-      .then(() => {
-        this.logger.log('Document saved successfully');
-        return 'Document saved successfully';
+      .then(({ documentId }) => {
+        this.logger.log(`Document Id ${documentId} saved successfully`);
+        return {
+          message: 'Document successfully created',
+          documentId,
+        };
       })
       .catch((error) => {
         this.logger.error(`Error saving document: ${error}`);
@@ -60,25 +63,35 @@ export class DocumentsService {
 
   /**
    * Retrieves all documents.
-   * @returns {Promise<DocumentEntity[]>} - A promise that resolves to an array of document entities.
+   * @returns {Promise<[]>} - A promise that resolves to an array of document objects.
    */
   findAll() {
-    return this.documentsRepo.find();
+    return this.documentsRepo.find().then((documents) => {
+      return documents.map((document) => ({
+        ...document,
+        owner: document.owner?.userId,
+      }));
+    });
   }
 
   /**
    * Retrieves a document by its ID.
    * @param {number} documentId - The ID of the document to retrieve.
-   * @returns {Promise<DocumentEntity>} - A promise that resolves to the document entity if found.
+   * @returns {object} - Document object.
    * @throws {NotFoundException} - If the document is not found.
    */
-  findOne(documentId: number) {
-    const document = this.documentsRepo.findOneBy({ documentId });
+  async findOne(documentId: number) {
+    const document = await this.documentsRepo.findOneBy({ documentId });
+
     if (!document) {
       this.logger.warn(`Document with ID ${documentId} not found`);
       throw new NotFoundException('Document not found');
     }
-    return document;
+
+    return {
+      ...document,
+      owner: document.owner?.userId,
+    };
   }
 
   /**
