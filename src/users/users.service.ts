@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UsersEntity } from './entity/users.entity';
+import { UserEntity } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -28,11 +28,11 @@ export class UsersService {
 
   /**
    * Creates an instance of UsersService.
-   * @param {Repository<UsersEntity>} usersRepo - The repository for user entities.
+   * @param {Repository<UserEntity>} usersRepo - The repository for user entities.
    */
   constructor(
-    @InjectRepository(UsersEntity)
-    private readonly usersRepo: Repository<UsersEntity>,
+    @InjectRepository(UserEntity)
+    private readonly usersRepo: Repository<UserEntity>,
   ) {}
 
   /**
@@ -61,7 +61,7 @@ export class UsersService {
 
   /**
    * Retrieves all users.
-   * @returns {Promise<UsersEntity[]>} - A promise that resolves to an array of user entities.
+   * @returns {Promise<UserEntity[]>} - A promise that resolves to an array of user entities.
    */
   findAll() {
     return this.usersRepo.find();
@@ -70,7 +70,7 @@ export class UsersService {
   /**
    * Retrieves a user by their ID.
    * @param {number} userId - The ID of the user to retrieve.
-   * @returns {Promise<UsersEntity>} - A promise that resolves to the user entity if found.
+   * @returns {Promise<UserEntity>} - A promise that resolves to the user entity if found.
    */
   async findOne(userId: number) {
     const user = await this.usersRepo.findOneBy({ userId });
@@ -84,10 +84,10 @@ export class UsersService {
   /**
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
-   * @returns {Promise<UsersEntity>} - A promise that resolves to the created user entity.
+   * @returns {Promise<UserEntity>} - A promise that resolves to the created user entity.
    * @throws {ConflictException} - If a user with the same username or email already exists.
    */
-  async create(dto: CreateUserDto): Promise<UsersEntity> {
+  async create(dto: CreateUserDto): Promise<UserEntity> {
     const user = this.usersRepo.create(dto);
     try {
       const savedUser = await this.usersRepo.save(user);
@@ -109,7 +109,7 @@ export class UsersService {
    * Updates an existing user.
    * @param {number} userId - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
-   * @returns {Promise<UsersEntity>} - A promise that resolves to the updated user entity.
+   * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
    * @throws {ConflictException} - If a user with the same username or email already exists.
@@ -160,7 +160,7 @@ export class UsersService {
   /**
    * Removes a user by their ID.
    * @param {number} userId - The ID of the user to remove.
-   * @returns {Promise<UsersEntity>} - A promise that resolves to the removed user entity.
+   * @returns {Promise<UserEntity>} - A promise that resolves to the removed user entity.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
    */
   async remove(userId: number) {

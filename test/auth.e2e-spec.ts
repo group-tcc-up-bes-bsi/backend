@@ -3,9 +3,9 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UsersEntity } from 'src/users/entity/users.entity';
+import { UserEntity } from 'src/users/entities/user.entity';
 
-describe('AuthController (e2e)', () => {
+describe('Auth Controller (e2e)', () => {
   let app: INestApplication;
   let db: DataSource;
 
@@ -18,8 +18,8 @@ describe('AuthController (e2e)', () => {
     await app.init();
 
     db = app.get(DataSource);
-    await db.getRepository(UsersEntity).clear();
-    await db.getRepository(UsersEntity).save({
+    await db.getRepository(UserEntity).delete({});
+    await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',

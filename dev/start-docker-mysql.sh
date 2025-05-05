@@ -17,6 +17,7 @@ else
     -e MYSQL_DATABASE=$DB_DATABASE \
     -e MYSQL_USER=$DB_USERNAME \
     -e MYSQL_PASSWORD=$DB_PASSWORD \
+    -e TZ="UTC" \
     -p $DB_PORT:3306 \
-    -d mysql:8
+    -d mysql:8 --default-time-zone='+00:00'
 fi
