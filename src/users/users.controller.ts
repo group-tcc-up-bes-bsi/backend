@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Delete,
   Param,
   Body,
@@ -12,6 +11,7 @@ import {
   UnauthorizedException,
   Request,
   Logger,
+  Patch,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
@@ -80,7 +80,7 @@ export class UsersController {
    * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
-  @Put(':id')
+  @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
