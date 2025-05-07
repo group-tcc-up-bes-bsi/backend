@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { APP_PIPE } from '@nestjs/core';
 import { DocumentsModule } from 'src/documents/documents.module';
+import { OrganizationsModule } from 'src/organizations/organizations.module';
 
 globalThis.crypto = {
   randomUUID: () => crypto.randomUUID(),
@@ -41,6 +42,7 @@ globalThis.crypto = {
     UsersModule,
     AuthModule,
     DocumentsModule,
+    OrganizationsModule,
   ],
   providers: [
     {

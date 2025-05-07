@@ -233,7 +233,7 @@ describe('Users Controller (e2e)', () => {
   describe('Update', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .send({ username: 'updated_user', password: 'newpassword123' })
         .expect(401)
         .expect((res) => {
@@ -249,7 +249,7 @@ describe('Users Controller (e2e)', () => {
       };
 
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updatedUser)
         .expect(200)
@@ -274,7 +274,7 @@ describe('Users Controller (e2e)', () => {
 
     it('User updated successfully - Only 1 param', () => {
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'updated_email@example.com' })
         .expect(200)
@@ -301,7 +301,7 @@ describe('Users Controller (e2e)', () => {
 
     it('Trying to update another user', () => {
       return request(app.getHttpServer())
-        .put('/users/99999')
+        .patch('/users/99999')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'nonexistent_user' })
         .expect((res) => {
@@ -313,7 +313,7 @@ describe('Users Controller (e2e)', () => {
 
     it('Invalid username', () => {
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 123 })
         .expect(400)
@@ -324,7 +324,7 @@ describe('Users Controller (e2e)', () => {
 
     it('Invalid password', () => {
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ password: 1234 })
         .expect(400)
@@ -335,7 +335,7 @@ describe('Users Controller (e2e)', () => {
 
     it('Invalid email', () => {
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ email: 'aaa' })
         .expect(400)
@@ -346,7 +346,7 @@ describe('Users Controller (e2e)', () => {
 
     it('Request without body', () => {
       return request(app.getHttpServer())
-        .put(`/users/${userId}`)
+        .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(400)
         .expect((res) => {

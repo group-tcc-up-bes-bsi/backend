@@ -1,4 +1,5 @@
 import { DocumentEntity } from 'src/documents/entities/document.entity';
+import { OrganizationEntity } from 'src/organizations/entities/organizations.entity';
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 
 /**
@@ -23,4 +24,7 @@ export class UserEntity {
 
   @OneToMany(() => DocumentEntity, (document) => document.owner)
   documents: DocumentEntity[];
+
+  @OneToMany(() => OrganizationEntity, (organization) => organization.owner)
+  organizations: OrganizationEntity[];
 }
