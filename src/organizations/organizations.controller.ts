@@ -15,6 +15,8 @@ import { OrganizationsService } from './organizations.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { CreateOrganizationUserDto } from './dto/create-organization-user.dto';
+import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto';
 
 /**
  * Controller for managing organization.
@@ -89,5 +91,73 @@ export class OrganizationsController {
   @Delete(':id')
   remove(@Param('id') id: number) {
     return this.organizationsService.remove(id);
+  }
+
+  /*Organization Users*/
+
+  /**
+   * Retrieves organization users by organization ID.
+   * Note: Only the organization users themselves can access this endpoint.
+   * @param {number} organizationId - The ID of the organization to retrieve users for.
+   * @returns {Promise<{}>} - A promise that resolves to the organization users data.
+   */
+  @Get(':organizationId')
+  findAllUsers(@Param('organizationId') organizationId: number) {
+    return this.organizationsService.findAllUsers(organizationId);
+  }
+
+  /**
+   * Creates a new organization user association.
+   * Automatically sets the userId and organizationId from the authenticated user's request
+   * if these values are not provided in the DTO.
+   * @param {CreateOrganizationUserDto} createOrganizationUserDto - The data transfer object
+   * containing organization user association details.
+   * @param {Request} request - The Express request object containing authenticated user information.
+   * @returns {Promise<{}>} - A promise that resolves to the newly created organization user association.
+   */
+  @HttpCode(HttpStatus.CREATED)
+  @Post()
+  createOrganizationUser(
+    @Body() createOrganizationUserDto: CreateOrganizationUserDto,
+    @Request() request,
+  ) {
+    if (!createOrganizationUserDto.userId) {
+      createOrganizationUserDto.userId = request.user.userId;
+    }
+    if (!createOrganizationUserDto.organizationId) {
+      createOrganizationUserDto.organizationId = request.user.organizationId;
+    }
+    return this.organizationsService.createOrganizationUser(
+      createOrganizationUserDto,
+    );
+  }
+
+  /**
+   * Updates an existing organization user association.
+   * Only the affected organization user or an authorized admin can access this endpoint.
+   * @param {number} userid - The ID of the organization user association to update.
+   * @param {UpdateOrganizationUserDto} updateOrganizationUserDto - The data transfer object containing the fields to update.
+   * @returns {Promise<{}>} - A promise that resolves to the updated organization user association.
+   */
+  @Patch(':userid')
+  updateOrganizationUser(
+    @Param('userid') userid: number,
+    @Body() updateOrganizationUserDto: UpdateOrganizationUserDto,
+  ) {
+    return this.organizationsService.updateOrganizationUser(
+      +userid,
+      updateOrganizationUserDto,
+    );
+  }
+
+  /**
+   * Deletes an organization user association by its ID.
+   * Only the affected organization user or an authorized admin can access this endpoint.
+   * @param {number} userid - The ID of the organization user association to delete.
+   * @returns {Promise<{}>} - A promise that resolves to the deleted organization user association.
+   */
+  @Delete(':userid')
+  removeOrganizationUser(@Param('userid') userid: number) {
+    return this.organizationsService.removeOrganizationUser(userid);
   }
 }

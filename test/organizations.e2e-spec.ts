@@ -7,7 +7,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import {
   OrganizationEntity,
   OrganizationType,
-} from 'src/organizations/entities/organizations.entity';
+} from 'src/organizations/entities/organization.entity';
 
 describe('OrganizationsController (e2e)', () => {
   let app: INestApplication;

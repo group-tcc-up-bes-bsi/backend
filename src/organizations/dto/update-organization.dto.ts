@@ -1,5 +1,5 @@
 import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-import { OrganizationType } from '../entities/organizations.entity';
+import { OrganizationType } from '../entities/organization.entity';
 /**
  * Data Transfer Object for updating a organization.
  */
