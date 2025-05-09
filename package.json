@@ -19,12 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest.config.ts --forceExit --runInBand",
     "test:ci": "npm run test && npm run test:e2e",
-    "prepare": "husky",
-    "typeorm": "ts-node -r tsconfig-paths/register ./data-source.ts",
-    "migration:generate": "npm run typeorm -- migration:generate src/migrations/NOME_MIGRACAO",
-    "migration:run": "npm run typeorm -- migration:run",
-    "migration:revert": "npm run typeorm -- migration:revert",
-    "migration:show": "npm run typeorm -- migration:show"
+    "prepare": "husky"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

@@ -4,10 +4,8 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
-  OneToMany
 } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { OrganizationLogEntity } from 'src/organization-log/entities/organization.log.entity';
 
 /**
  * Supported organization types
@@ -36,11 +34,7 @@ export class OrganizationEntity {
   @Column({ type: 'enum', enum: OrganizationType })
   organizationType: OrganizationType;
 
-  @ManyToOne(() => UserEntity, (user) => user.organizations, { eager: true })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => UserEntity, (user) => user.organizations, { eager: true }) // eager: user entity will be loaded with the document
+  @JoinColumn({ name: 'userId' }) // Foreign key column in the organizations table
   owner: UserEntity;
-
-  @OneToMany(() => OrganizationLogEntity, (log) => log.organization)
-  logs: OrganizationLogEntity[];
 }
-
