@@ -15,7 +15,7 @@ import { OrganizationsService } from './organizations.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
-import { CreateOrganizationUserDto } from './dto/create-organization-user.dto';
+import { AddUserToOrganizationDto } from './dto/addUserToOrganization.dto';
 import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto';
 
 /**
@@ -107,32 +107,6 @@ export class OrganizationsController {
   }
 
   /**
-   * Creates a new organization user association.
-   * Automatically sets the userId and organizationId from the authenticated user's request
-   * if these values are not provided in the DTO.
-   * @param {CreateOrganizationUserDto} createOrganizationUserDto - The data transfer object
-   * containing organization user association details.
-   * @param {Request} request - The Express request object containing authenticated user information.
-   * @returns {Promise<{}>} - A promise that resolves to the newly created organization user association.
-   */
-  @HttpCode(HttpStatus.CREATED)
-  @Post(':organizationId/users')
-  createOrganizationUser(
-    @Body() createOrganizationUserDto: CreateOrganizationUserDto,
-    @Request() request,
-  ) {
-    if (!createOrganizationUserDto.userId) {
-      createOrganizationUserDto.userId = request.user.userId;
-    }
-    if (!createOrganizationUserDto.organizationId) {
-      createOrganizationUserDto.organizationId = request.user.organizationId;
-    }
-    return this.organizationsService.createOrganizationUser(
-      createOrganizationUserDto,
-    );
-  }
-
-  /**
    * Updates an existing organization user association.
    * Only the affected organization user or an authorized admin can access this endpoint.
    * @param {number} userid - The ID of the organization user association to update.
@@ -151,13 +125,51 @@ export class OrganizationsController {
   }
 
   /**
-   * Deletes an organization user association by its ID.
-   * Only the affected organization user or an authorized admin can access this endpoint.
-   * @param {number} userid - The ID of the organization user association to delete.
-   * @returns {Promise<{}>} - A promise that resolves to the deleted organization user association.
+   * Adds a user to an organization.
+   * Only the organization owner can access this endpoint.
+   * @param {AddUserToOrganizationDto} dto - Add user to organization data transfer object.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<any>} - A promise that resolves to the result of the operation.
    */
-  @Delete(':organizationId/users/:userid')
-  removeOrganizationUser(@Param('userid') userid: number) {
-    return this.organizationsService.removeOrganizationUser(userid);
+  @Post('addUser')
+  addUserToOrganization(
+    @Body() dto: AddUserToOrganizationDto,
+    @Request() request,
+  ) {
+    return this.organizationsService.addUserToOrganization(
+      dto,
+      +request.user.userId,
+    );
+  }
+
+  /**
+   * Removes a user from an organization.
+   * Only the organization owner or its own user can access this endpoint.
+   * @param {string} orgId - Organization ID.
+   * @param {string} userId - User ID.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<any>} - A promise that resolves to the result of the operation.
+   */
+  @Delete('removeUser/:organizationId/:userId')
+  removeUserFromOrganization(
+    @Param('organizationId') orgId: string,
+    @Param('userId') userId: string,
+    @Request() request,
+  ) {
+    const options = {
+      orgId: +orgId,
+      userId: +userId,
+      requestUserId: +request.user.userId,
+    };
+    return this.organizationsService.removeUserFromOrganization(options);
   }
 }
+
+// TODO: Enhance this logic, organizationUser should have only 3 public endpoints:
+// 1. Add user to an organization.
+// 2. Remove user from an organization.
+// 3. Get all users from an organization.
+//
+// When a organization is created, organizationUser should be created automatically.
+// And the user who created the organization should be the owner of the organization.
+// When deleting a organization, its organizationUser should be deleted.

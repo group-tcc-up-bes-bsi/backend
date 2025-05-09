@@ -28,18 +28,12 @@ export class OrganizationUserEntity {
   @PrimaryGeneratedColumn()
   organizationUserId: number;
 
-  @ManyToOne(() => UserEntity, (user) => user.organizationUsers, {
-    eager: true,
-  }) // eager: user entity will be loaded with the document
-  @JoinColumn({ name: 'userId' }) // Foreign key column in the organization-users table
+  @ManyToOne(() => UserEntity, (user) => user.organizations)
+  @JoinColumn({ name: 'userId' }) // Foreign key
   user: UserEntity;
 
-  @ManyToOne(
-    () => OrganizationEntity,
-    (organization) => organization.organizationUsers,
-    { eager: true },
-  ) // eager: user entity will be loaded with the document
-  @JoinColumn({ name: 'organizationId' }) // Foreign key column in the organization-users table
+  @ManyToOne(() => OrganizationEntity, (org) => org.organizationUsers)
+  @JoinColumn({ name: 'organizationId' }) // Foreign key
   organization: OrganizationEntity;
 
   @Column({ type: 'enum', enum: UserType })

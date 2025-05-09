@@ -1,10 +1,4 @@
-import {
-  IsBoolean,
-  IsEnum,
-  IsNumber,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
 import { UserType } from '../entities/organization-user.entity';
 
 /**
@@ -12,22 +6,14 @@ import { UserType } from '../entities/organization-user.entity';
  */
 export class UpdateOrganizationUserDto {
   @IsOptional()
-  @IsString()
-  organizationName: string;
-
-  @IsOptional()
-  @IsNumber()
-  userId: number;
-
-  @IsOptional()
-  @IsNumber()
-  organizationId: number;
-
-  @IsOptional()
   @IsEnum(UserType)
-  userType: UserType;
+  userType: UserType; // TODO: Only organization owner must change this field.
 
   @IsOptional()
   @IsBoolean()
   inviteAccepted: boolean;
 }
+
+// Maybe two different endpoints:
+//  1. Change user type.
+//  2. Change inviteAccepted status.
