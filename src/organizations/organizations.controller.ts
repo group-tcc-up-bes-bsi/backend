@@ -101,7 +101,7 @@ export class OrganizationsController {
    * @param {number} organizationId - The ID of the organization to retrieve users for.
    * @returns {Promise<{}>} - A promise that resolves to the organization users data.
    */
-  @Get(':organizationId')
+  @Get(':organizationId/users')
   findAllUsers(@Param('organizationId') organizationId: number) {
     return this.organizationsService.findAllUsers(organizationId);
   }
@@ -116,7 +116,7 @@ export class OrganizationsController {
    * @returns {Promise<{}>} - A promise that resolves to the newly created organization user association.
    */
   @HttpCode(HttpStatus.CREATED)
-  @Post()
+  @Post(':organizationId/users')
   createOrganizationUser(
     @Body() createOrganizationUserDto: CreateOrganizationUserDto,
     @Request() request,
@@ -139,7 +139,7 @@ export class OrganizationsController {
    * @param {UpdateOrganizationUserDto} updateOrganizationUserDto - The data transfer object containing the fields to update.
    * @returns {Promise<{}>} - A promise that resolves to the updated organization user association.
    */
-  @Patch(':userid')
+  @Patch(':organizationId/users/:userid')
   updateOrganizationUser(
     @Param('userid') userid: number,
     @Body() updateOrganizationUserDto: UpdateOrganizationUserDto,
@@ -156,7 +156,7 @@ export class OrganizationsController {
    * @param {number} userid - The ID of the organization user association to delete.
    * @returns {Promise<{}>} - A promise that resolves to the deleted organization user association.
    */
-  @Delete(':userid')
+  @Delete(':organizationId/users/:userid')
   removeOrganizationUser(@Param('userid') userid: number) {
     return this.organizationsService.removeOrganizationUser(userid);
   }
