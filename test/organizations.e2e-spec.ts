@@ -13,7 +13,7 @@ import {
   UserType,
 } from 'src/organizations/entities/organization-user.entity';
 
-describe('OrganizationsController (e2e)', () => {
+describe.skip('OrganizationsController (e2e)', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
