@@ -5,6 +5,8 @@ import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { DocumentEntity } from 'src/documents/entities/document.entity';
+import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
+import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
 
 describe('Documents Controller (e2e)', () => {
   let app: INestApplication;
@@ -28,6 +30,8 @@ describe('Documents Controller (e2e)', () => {
 
     db = app.get(DataSource);
 
+    await db.getRepository(OrganizationUserEntity).delete({});
+    await db.getRepository(OrganizationEntity).delete({});
     await db.getRepository(UserEntity).delete({});
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
