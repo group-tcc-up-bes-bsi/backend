@@ -59,10 +59,7 @@ describe.skip('OrganizationsController (e2e)', () => {
 
   describe('Create', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .post('/organizations')
-        .send(organization)
-        .expect(401);
+      return request(app.getHttpServer()).post('/organizations').send(organization).expect(401);
     });
 
     it('Organization created successfully', async () => {
@@ -179,10 +176,7 @@ describe.skip('OrganizationsController (e2e)', () => {
 
   describe('Update', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .patch(`/organizations/1`)
-        .send(organization)
-        .expect(401);
+      return request(app.getHttpServer()).patch(`/organizations/1`).send(organization).expect(401);
     });
 
     it('Organization updated successfully', async () => {
@@ -205,13 +199,9 @@ describe.skip('OrganizationsController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(newOrganization)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Organization successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
       expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId }),
+        await db.getRepository(OrganizationEntity).findOneBy({ organizationId }),
       ).toMatchObject({
         ...newOrganization,
         organizationId,
@@ -234,14 +224,10 @@ describe.skip('OrganizationsController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ organizationName: 'updated organization' })
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Organization successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
 
       expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId }),
+        await db.getRepository(OrganizationEntity).findOneBy({ organizationId }),
       ).toMatchObject({
         ...organization,
         organizationName: 'updated organization',
@@ -275,10 +261,7 @@ describe.skip('OrganizationsController (e2e)', () => {
 
   describe('Delete', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .delete(`/organizations/1`)
-        .set(organization)
-        .expect(401);
+      return request(app.getHttpServer()).delete(`/organizations/1`).set(organization).expect(401);
     });
 
     it('Organization deleted successfully', async () => {
@@ -295,14 +278,8 @@ describe.skip('OrganizationsController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ organizationName: 'updated organization' })
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Organization sucessfully removed'),
-        );
-      expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId }),
-      ).toBeNull();
+        .expect(({ text }) => expect(text).toBe('Organization sucessfully removed'));
+      expect(await db.getRepository(OrganizationEntity).findOneBy({ organizationId })).toBeNull();
     });
 
     it('Organization not found', () => {
@@ -340,9 +317,7 @@ describe.skip('OrganizationsController (e2e)', () => {
     });
 
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .get(`/organizations/${organizationId}/users`)
-        .expect(401);
+      return request(app.getHttpServer()).get(`/organizations/${organizationId}/users`).expect(401);
     });
 
     it('Get all organization users', async () => {
@@ -503,9 +478,7 @@ describe.skip('OrganizationsController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateData)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Organization user successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
 
       const updated = await db.getRepository(OrganizationUserEntity).findOneBy({
         organizationUserId,
@@ -541,9 +514,7 @@ describe.skip('OrganizationsController (e2e)', () => {
         .send({ inviteAccepted: 'not-a-boolean' })
         .expect(400)
         .expect((res) => {
-          expect(res.body.message).toContain(
-            'inviteAccepted must be a boolean value',
-          );
+          expect(res.body.message).toContain('inviteAccepted must be a boolean value');
         });
     });
   });
@@ -580,14 +551,10 @@ describe.skip('OrganizationsController (e2e)', () => {
         .delete(`/organizations/${organizationId}/users/${organizationUserId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Organization user successfully removed'),
-        );
+        .expect(({ text }) => expect(text).toBe('Organization user successfully removed'));
 
       expect(
-        await db
-          .getRepository(OrganizationUserEntity)
-          .findOneBy({ organizationUserId }),
+        await db.getRepository(OrganizationUserEntity).findOneBy({ organizationUserId }),
       ).toBeNull();
     });
 

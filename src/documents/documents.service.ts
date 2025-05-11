@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -113,9 +108,7 @@ export class DocumentsService {
       .update(documentId, updateDocumentDto)
       .then((result) => {
         if (result.affected > 0) {
-          this.logger.log(
-            `Document with ID ${documentId} successfully updated`,
-          );
+          this.logger.log(`Document with ID ${documentId} successfully updated`);
           return 'Document successfully updated';
         } else {
           this.logger.warn(`No document found with ID ${documentId} to update`);
@@ -126,10 +119,7 @@ export class DocumentsService {
         if (e.name === 'NotFoundException') {
           throw e;
         }
-        this.logger.error(
-          `Error updating document with ID ${documentId}`,
-          e.stack,
-        );
+        this.logger.error(`Error updating document with ID ${documentId}`, e.stack);
         throw new Error('Error updating user');
       });
   }
@@ -147,16 +137,11 @@ export class DocumentsService {
       return this.documentsRepo
         .remove(document)
         .then(() => {
-          this.logger.log(
-            `Document with ID ${documentId} successfully removed`,
-          );
+          this.logger.log(`Document with ID ${documentId} successfully removed`);
           return 'Document successfully removed';
         })
         .catch((e) => {
-          this.logger.error(
-            `Error removing document with ID ${documentId}`,
-            e.stack,
-          );
+          this.logger.error(`Error removing document with ID ${documentId}`, e.stack);
           throw new Error('Error deleting document');
         });
     } else {

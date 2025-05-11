@@ -25,9 +25,6 @@ export class UserEntity {
   @OneToMany(() => DocumentEntity, (document) => document.owner)
   documents: DocumentEntity[];
 
-  @OneToMany(
-    () => OrganizationUserEntity,
-    (organizationUser) => organizationUser.user,
-  )
+  @OneToMany(() => OrganizationUserEntity, (organizationUser) => organizationUser.user)
   organizations: OrganizationUserEntity[];
 }

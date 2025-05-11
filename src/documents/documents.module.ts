@@ -10,11 +10,7 @@ import { UsersModule } from 'src/users/users.module';
  * Module for managing documents.
  */
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([DocumentEntity]),
-    AuthModule,
-    UsersModule,
-  ],
+  imports: [TypeOrmModule.forFeature([DocumentEntity]), AuthModule, UsersModule],
   controllers: [DocumentsController],
   providers: [DocumentsService],
 })

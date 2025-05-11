@@ -227,9 +227,7 @@ describe('Users Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe(
-            'You are not authorized to access this resource',
-          );
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
   });
@@ -309,9 +307,7 @@ describe('Users Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'nonexistent_user' })
         .expect((res) => {
-          expect(res.body.message).toBe(
-            'You are not authorized to access this resource',
-          );
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
 
@@ -396,9 +392,7 @@ describe('Users Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe(
-            'You are not authorized to access this resource',
-          );
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
   });

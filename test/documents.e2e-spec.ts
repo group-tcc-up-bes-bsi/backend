@@ -57,10 +57,7 @@ describe('Documents Controller (e2e)', () => {
 
   describe('Create', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .post('/documents')
-        .send(testDocument)
-        .expect(401);
+      return request(app.getHttpServer()).post('/documents').send(testDocument).expect(401);
     });
 
     it('Document created successfully', async () => {
@@ -76,9 +73,7 @@ describe('Documents Controller (e2e)', () => {
       });
 
       expect(
-        await db
-          .getRepository(DocumentEntity)
-          .findOneBy({ documentId: body.documentId }),
+        await db.getRepository(DocumentEntity).findOneBy({ documentId: body.documentId }),
       ).toMatchObject({
         ...testDocument,
         documentId: body.documentId,
@@ -181,10 +176,7 @@ describe('Documents Controller (e2e)', () => {
 
   describe('Update', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .patch('/documents/1')
-        .send(testDocument)
-        .expect(401);
+      return request(app.getHttpServer()).patch('/documents/1').send(testDocument).expect(401);
     });
 
     it('Document updated successfully', async () => {
@@ -207,13 +199,9 @@ describe('Documents Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(newDocument)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Document successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Document successfully updated'));
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId }),
-      ).toMatchObject({
+      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
         ...newDocument,
         documentId,
         documentCreationDate: expect.any(Date),
@@ -235,13 +223,9 @@ describe('Documents Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ documentName: 'updated document' })
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Document successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Document successfully updated'));
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId }),
-      ).toMatchObject({
+      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
         ...testDocument,
         documentName: 'updated document',
         documentId,
@@ -261,10 +245,7 @@ describe('Documents Controller (e2e)', () => {
 
   describe('Delete', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .delete('/documents/1')
-        .send(testDocument)
-        .expect(401);
+      return request(app.getHttpServer()).delete('/documents/1').send(testDocument).expect(401);
     });
 
     it('Document deleted successfully', async () => {
@@ -280,13 +261,9 @@ describe('Documents Controller (e2e)', () => {
         .delete(`/documents/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Document successfully removed'),
-        );
+        .expect(({ text }) => expect(text).toBe('Document successfully removed'));
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId }),
-      ).toBeNull();
+      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toBeNull();
     });
 
     it('Document not found', () => {

@@ -20,7 +20,7 @@ import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto';
 
 /**
  * Controller for managing organization.
- * Uses AuthGuard, only authenticated users can access its routes.
+ * Uses AuthGuard, only authenticated users can access this routes.
  */
 @UseGuards(AuthGuard)
 @Controller('organizations')
@@ -60,10 +60,7 @@ export class OrganizationsController {
    */
   @HttpCode(HttpStatus.CREATED)
   @Post()
-  create(
-    @Body() createOrganizationDto: CreateOrganizationDto,
-    @Request() request,
-  ) {
+  create(@Body() createOrganizationDto: CreateOrganizationDto, @Request() request) {
     if (!createOrganizationDto.userCreatedId) {
       createOrganizationDto.userCreatedId = request.user.userId;
     }
@@ -93,37 +90,6 @@ export class OrganizationsController {
     return this.organizationsService.remove(id);
   }
 
-  /*Organization Users*/
-
-  /**
-   * Retrieves organization users by organization ID.
-   * Note: Only the organization users themselves can access this endpoint.
-   * @param {number} organizationId - The ID of the organization to retrieve users for.
-   * @returns {Promise<{}>} - A promise that resolves to the organization users data.
-   */
-  @Get(':organizationId/users')
-  findAllUsers(@Param('organizationId') organizationId: number) {
-    return this.organizationsService.findAllUsers(organizationId);
-  }
-
-  /**
-   * Updates an existing organization user association.
-   * Only the affected organization user or an authorized admin can access this endpoint.
-   * @param {number} userid - The ID of the organization user association to update.
-   * @param {UpdateOrganizationUserDto} updateOrganizationUserDto - The data transfer object containing the fields to update.
-   * @returns {Promise<{}>} - A promise that resolves to the updated organization user association.
-   */
-  @Patch(':organizationId/users/:userid')
-  updateOrganizationUser(
-    @Param('userid') userid: number,
-    @Body() updateOrganizationUserDto: UpdateOrganizationUserDto,
-  ) {
-    return this.organizationsService.updateOrganizationUser(
-      +userid,
-      updateOrganizationUserDto,
-    );
-  }
-
   /**
    * Adds a user to an organization.
    * Only the organization owner can access this endpoint.
@@ -132,14 +98,32 @@ export class OrganizationsController {
    * @returns {Promise<any>} - A promise that resolves to the result of the operation.
    */
   @Post('addUser')
-  addUserToOrganization(
-    @Body() dto: AddUserToOrganizationDto,
-    @Request() request,
-  ) {
-    return this.organizationsService.addUserToOrganization(
-      dto,
-      +request.user.userId,
-    );
+  addUserToOrganization(@Body() dto: AddUserToOrganizationDto, @Request() request) {
+    return this.organizationsService.addUserToOrganization(dto, +request.user.userId);
+  }
+
+  /**
+   * Updates user permission in an organization.
+   * Only the organization owner can access this endpoint.
+   * @param {UpdateOrganizationUserDto} dto - Update organization user data transfer object.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<any>} - A promise that resolves to the result of the operation.
+   */
+  @Patch('updateUser/permission')
+  updateUserPermission(@Body() dto: UpdateOrganizationUserDto, @Request() request) {
+    return this.organizationsService.updateUserPermission(dto, +request.user.userId);
+  }
+
+  /**
+   * Updates user invite status in an organization.
+   * Only the user itself can access this endpoint.
+   * @param {UpdateOrganizationUserDto} dto - Update organization user data transfer object.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<any>} - A promise that resolves to the result of the operation.
+   */
+  @Patch('updateUser/invite')
+  updateUserInviteStatus(@Body() dto: UpdateOrganizationUserDto, @Request() request) {
+    return this.organizationsService.updateUserPermission(dto, +request.user.userId);
   }
 
   /**
@@ -165,11 +149,7 @@ export class OrganizationsController {
   }
 }
 
-// TODO: Enhance this logic, organizationUser should have only 3 public endpoints:
-// 1. Add user to an organization.
-// 2. Remove user from an organization.
-// 3. Get all users from an organization.
-//
-// When a organization is created, organizationUser should be created automatically.
-// And the user who created the organization should be the owner of the organization.
-// When deleting a organization, its organizationUser should be deleted.
+// TODO: Enhance organization logic:
+// 1. When a organization is created, organizationUser should be created automatically.
+// 2. And the user who created the organization should be the owner of the organization.
+// 3. When deleting a organization, its organizationUser should be deleted.
