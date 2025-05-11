@@ -277,14 +277,8 @@ describe('OrganizationsController (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ organizationName: 'updated organization' })
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Organization successfully removed'),
-        );
-      expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId }),
-      ).toBeNull();
+        .expect(({ text }) => expect(text).toBe('Organization successfully removed'));
+      expect(await db.getRepository(OrganizationEntity).findOneBy({ organizationId })).toBeNull();
     });
 
     it('Organization not found', () => {
@@ -564,23 +558,19 @@ describe('OrganizationsController (e2e)', () => {
       });
 
       await request(app.getHttpServer())
-        .delete(
-          `/organizations/removeUser/${organizationId}/${userToDelete.userId}`,
-        )
+        .delete(`/organizations/removeUser/${organizationId}/${userToDelete.userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect(({ text }) => {
           expect(text).toBe('User successfully removed from organization');
         });
 
-      const deletedUser = await db
-        .getRepository(OrganizationUserEntity)
-        .findOne({
-          where: {
-            user: { userId: userToDelete.userId },
-            organization: { organizationId },
-          },
-        });
+      const deletedUser = await db.getRepository(OrganizationUserEntity).findOne({
+        where: {
+          user: { userId: userToDelete.userId },
+          organization: { organizationId },
+        },
+      });
       expect(deletedUser).toBeNull();
     });
 
@@ -610,9 +600,7 @@ describe('OrganizationsController (e2e)', () => {
           .send({ email: 'outsider@test.com', password: '123456' })
       ).body.token;
       request(app.getHttpServer())
-        .delete(
-          `/organizations/removeUser/${organizationId}/${userOutSider.userId}`,
-        )
+        .delete(`/organizations/removeUser/${organizationId}/${userOutSider.userId}`)
         .set('Authorization', `Bearer ${outsiderToken}`)
         .expect(401)
         .expect((res) => {
