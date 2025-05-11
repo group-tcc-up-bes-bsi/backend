@@ -156,27 +156,29 @@ export class OrganizationsService {
     const organization = await this.organizationsRepo.findOneBy({
       organizationId,
     });
-    if (organization) {
-      return this.organizationsRepo
-        .remove(organization)
-        .then(() => {
-          this.logger.log(
-            `Organization with ID ${organizationId} successfully removed`,
-          );
-          return 'Organization sucessfully removed';
-        })
-        .catch((e) => {
-          this.logger.error(
-            `Error removing organization with ID ${organizationId}`,
-            e.stack,
-          );
-          throw new Error('Error deleting organization');
-        });
-    } else {
+    if (!organization) {
       this.logger.warn(
         `Organization with ID ${organizationId} not found for removal`,
       );
       throw new NotFoundException('Organization not found');
+    }
+
+    try {
+      await this.organizationUserRepo.delete({
+        organization: { organizationId },
+      });
+      await this.organizationsRepo.remove(organization);
+
+      this.logger.log(
+        `Organization with ID ${organizationId} successfully removed`,
+      );
+      return 'Organization successfully removed';
+    } catch (e) {
+      this.logger.error(
+        `Error removing organization with ID ${organizationId}`,
+        e.stack,
+      );
+      throw new Error('Error deleting organization');
     }
   }
 
@@ -202,6 +204,20 @@ export class OrganizationsService {
     if (!organization) {
       this.logger.error(`Organization ${organizationId} was not found.`);
       return new NotFoundException(`Organization was not found`);
+    }
+
+    const existingUser = await this.organizationUserRepo.findOne({
+      where: {
+        user: { userId },
+        organization: { organizationId },
+      },
+    });
+
+    if (existingUser) {
+      this.logger.error(
+        `User ${userId} is already in organization ${organizationId}`,
+      );
+      throw new Error('User is already in this organization');
     }
 
     return this.organizationUserRepo
@@ -312,19 +328,28 @@ export class OrganizationsService {
   ) {
     const { organizationId } = dto;
 
-    const { userType: requestUserType } =
-      await this.organizationUserRepo.findOneBy({
-        organization: { organizationId },
-        user: { userId: requestUserId },
-      });
+    // First check if the requesting user is in the organization
+    const requestUserOrg = await this.organizationUserRepo.findOneBy({
+      organization: { organizationId },
+      user: { userId: requestUserId },
+    });
 
-    // Check if the user is allowed to add
-    if (requestUserType !== UserType.OWNER) {
+    if (!requestUserOrg) {
+      this.logger.warn(
+        `User ${requestUserId} is not part of organization ${organizationId}`,
+      );
+      throw new UnauthorizedException(
+        'You are not a member of this organization',
+      );
+    }
+
+    // Check if the user is allowed to add others
+    if (requestUserOrg.userType !== UserType.OWNER) {
       this.logger.warn(
         `User ${requestUserId} is not authorized to add a new user to organization ${organizationId}.`,
       );
       throw new UnauthorizedException(
-        'You do not have permission to add an user',
+        'You do not have permission to add a user',
       );
     }
 
@@ -343,13 +368,31 @@ export class OrganizationsService {
   async removeUserFromOrganization(options) {
     const { orgId, userId, requestUserId } = options;
 
-    const { userType: requestUserType } =
-      await this.organizationUserRepo.findOneBy({
-        organization: { organizationId: orgId },
-        user: { userId: requestUserId },
-      });
+    const requestUserOrg = await this.organizationUserRepo.findOneBy({
+      organization: { organizationId: orgId },
+      user: { userId: requestUserId },
+    });
 
-    // Check if the user is allowed to delete
+    if (!requestUserOrg) {
+      this.logger.warn(
+        `User ${requestUserId} is not part of organization ${orgId}`,
+      );
+      throw new UnauthorizedException(
+        'You are not a member of this organization',
+      );
+    }
+
+    if (!requestUserOrg) {
+      this.logger.warn(
+        `User ${requestUserId} is not part of organization ${orgId}`,
+      );
+      throw new UnauthorizedException(
+        'You are not a member of this organization',
+      );
+    }
+
+    const requestUserType = requestUserOrg.userType;
+
     if (requestUserId !== userId && requestUserType !== UserType.OWNER) {
       this.logger.warn(
         `User${requestUserId} is not authorized to remove user ${userId} from organization`,
