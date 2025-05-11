@@ -144,20 +144,30 @@ export class OrganizationsService {
     const organization = await this.organizationsRepo.findOneBy({
       organizationId,
     });
-    if (organization) {
-      return this.organizationsRepo
-        .remove(organization)
-        .then(() => {
-          this.logger.log(`Organization with ID ${organizationId} successfully removed`);
-          return 'Organization sucessfully removed';
-        })
-        .catch((e) => {
-          this.logger.error(`Error removing organization with ID ${organizationId}`, e.stack);
-          throw new Error('Error deleting organization');
-        });
-    } else {
-      this.logger.warn(`Organization with ID ${organizationId} not found for removal`);
+
+    if (!organization) {
+      this.logger.warn(
+        `Organization with ID ${organizationId} not found for removal`,
+      );
       throw new NotFoundException('Organization not found');
+    }
+
+    try {
+      await this.organizationUserRepo.delete({
+        organization: { organizationId },
+      });
+      await this.organizationsRepo.remove(organization);
+
+      this.logger.log(
+        `Organization with ID ${organizationId} successfully removed`,
+      );
+      return 'Organization successfully removed';
+    } catch (e) {
+      this.logger.error(
+        `Error removing organization with ID ${organizationId}`,
+        e.stack,
+      );
+      throw new Error('Error deleting organization');
     }
   }
 
@@ -195,6 +205,20 @@ export class OrganizationsService {
     if (!organization) {
       this.logger.error(`Organization ${organizationId} was not found.`);
       return new NotFoundException(`Organization was not found`);
+    }
+
+    const existingUser = await this.organizationUserRepo.findOne({
+      where: {
+        user: { userId },
+        organization: { organizationId },
+      },
+    });
+
+    if (existingUser) {
+      this.logger.error(
+        `User ${userId} is already in organization ${organizationId}`,
+      );
+      throw new Error('User is already in this organization');
     }
 
     return this.organizationUserRepo
@@ -322,8 +346,8 @@ export class OrganizationsService {
       user: { userId: requestUserId },
     });
 
-    // Check if the user is allowed to add
-    if (requestUserType !== UserType.OWNER) {
+    // Check if the user is allowed to add others
+    if (requestUserOrg.userType !== UserType.OWNER) {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying add a new user to organization ${organizationId}.`,
       );
