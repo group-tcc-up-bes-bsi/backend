@@ -4,6 +4,8 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
+import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
+import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
 
 describe('Auth Controller (e2e)', () => {
   let app: INestApplication;
@@ -18,6 +20,8 @@ describe('Auth Controller (e2e)', () => {
     await app.init();
 
     db = app.get(DataSource);
+    await db.getRepository(OrganizationUserEntity).delete({});
+    await db.getRepository(OrganizationEntity).delete({});
     await db.getRepository(UserEntity).delete({});
     await db.getRepository(UserEntity).save({
       username: 'john_doe',
