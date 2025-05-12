@@ -36,29 +36,60 @@ export class OrganizationsService {
     private usersService: UsersService,
   ) {}
 
+  ///////////////////////////////////////////////////////////////////////
+  // Private general functions
+  ///////////////////////////////////////////////////////////////////////
+
+  /**
+   * Checks if the user is the owner of the organization.
+   * @param {number} userId - The ID of the user to check.
+   * @param {number} organizationId - The ID of the organization to check.
+   * @param {string} context - Function name that is calling this function.
+   * @throws {UnauthorizedException} - If the user is not the owner of the organization.
+   * @returns {Promise<void>} - A promise that resolves if the user is the owner.
+   */
+  private async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
+    return this.organizationUserRepo
+      .findOneBy({
+        organization: { organizationId },
+        user: { userId },
+      })
+      .then(({ userType }) => {
+        if (userType !== UserType.OWNER) {
+          this.logger.warn(
+            `[SECURITY] User ${userId} is trying to update organization ${organizationId} via ${context}`,
+          );
+          throw new UnauthorizedException('You do not have permission to do this');
+        }
+      });
+  }
+
+  ///////////////////////////////////////////////////////////////////////
+  // Public OrganizationUsers interfaces
+  ///////////////////////////////////////////////////////////////////////
+
   /**
    * Creates a new organization.
-   * @param {CreateOrganizationDto} createOrganizationDto - The data transfer object containing organization information.
+   * @param {CreateOrganizationDto} dto - The data transfer object containing organization information.
+   * @param {number} userId - The ID of the user creating the organization.
    * @returns {object} - Object containing message and organizationId.
    * @throws {NotFoundException} - If the user is not found.
    * @throws {Error} - If an error occurs during the save process.
    */
-  async create(createOrganizationDto: CreateOrganizationDto) {
-    const { userCreatedId, ...rest } = createOrganizationDto;
-
-    const user = await this.usersService.findOne(userCreatedId);
+  async createOrganization(dto: CreateOrganizationDto, userId: number) {
+    const user = await this.usersService.findOne(userId);
 
     if (!user) {
-      this.logger.error(`User with ID ${userCreatedId} was not found.`);
+      this.logger.warn(`User with ID ${userId} was not found.`);
       return new NotFoundException(`User was not found`);
     }
 
     return this.organizationsRepo
-      .save(this.organizationsRepo.create({ ...rest }))
+      .save(this.organizationsRepo.create(dto))
       .then(({ organizationId }) => {
-        this.logger.log(`Organization Id ${organizationId} seved sucessfully`);
+        this.logger.log(`Organization Id ${organizationId} saved sucessfully`);
         return this.createOrganizationUser({
-          userId: userCreatedId,
+          userId,
           organizationId,
           userType: UserType.OWNER,
         }).then(() => {
@@ -69,25 +100,17 @@ export class OrganizationsService {
         });
       })
       .catch((error) => {
-        this.logger.error(`Error saving organization: ${error}`);
+        this.logger.error('Error saving organization:', error.stack);
         throw new Error('Error saving organization');
       });
   }
 
   /**
-   * Retrieves all organizations.
-   * @returns {Promise<[]>} - A promise that resolves to an array of organization entities.
-   */
-  findAll() {
-    return this.organizationsRepo.find();
-  }
-
-  /**
    * Retrieves a organization by their ID.
    * @param {number} organizationId - The ID of the organization to retrieve.
-   * @returns {Promise<OrganizationEntity>} - A promise that resolves to the organization entity if found.
+   * @returns {OrganizationEntity} - The organization entity if found.
    */
-  async findOne(organizationId: number) {
+  async findOneOrganization(organizationId: number) {
     const organization = await this.organizationsRepo.findOneBy({
       organizationId,
     });
@@ -99,26 +122,64 @@ export class OrganizationsService {
   }
 
   /**
+   * Retrieves all organizations for a specific user.
+   * @param {number} userId - The ID of the user to retrieve organizations for.
+   * @returns {Promise<[]>} - A promise that resolves to an array of organization entities.
+   * @throws {NotFoundException} - If no organizations are found for the user.
+   * @throws {Error} - If an error occurs during the retrieval process.
+   */
+  findOrganizationsByUser(userId: number) {
+    return this.organizationUserRepo
+      .find({
+        where: { user: { userId } },
+        relations: ['organization'],
+      })
+      .then((orgUsers) => {
+        if (!orgUsers || orgUsers.length === 0) {
+          this.logger.warn(`No organizations found for user with ID ${userId}`);
+          throw new NotFoundException('No organizations found for this user');
+        }
+        return orgUsers.map((orgUser) => orgUser.organization);
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error retrieving organizations for user with ID ${userId}`, e.stack);
+        throw new Error('Error retrieving organizations');
+      });
+  }
+
+  /**
    * Updates an existing organization.
+   * Only the organization owner can access this handler.
    * @param {number} organizationId - The ID of the organization to update.
-   * @param {UpdateOrganizationDto} updateOrganizationDto - The data transfer object containing updated organization information.
-   * @returns {Promise<string>} - A promise that resolves to the updated organization entity.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @param {UpdateOrganizationDto} dto  - The data transfer object containing updated organization information.
+   * @returns {string} - A success message.
+   * @throws {UnauthorizedException} - If the user is not authorized to update the organization.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the organization with the specified ID does not exist.
    * @throws {Error} - If an error occurs during the update process.
    */
-  update(organizationId: number, updateOrganizationDto: UpdateOrganizationDto) {
-    if (Object.keys(updateOrganizationDto).length === 0) {
+  async updateOrganization(
+    organizationId: number,
+    requestUserId: number,
+    dto: UpdateOrganizationDto,
+  ) {
+    // Security check
+    await this.checkIfUserIsOwner(organizationId, requestUserId, 'updateOrganization');
+
+    if (Object.keys(dto).length === 0) {
       this.logger.warn(`No data provided for update organizationId ${organizationId}`);
       throw new BadRequestException('No data provided for update');
     }
 
     return this.organizationsRepo
-      .update(organizationId, updateOrganizationDto)
-      .then((result) => {
-        if (result.affected > 0) {
+      .update(organizationId, dto)
+      .then(({ affected }) => {
+        if (affected > 0) {
           this.logger.log(`Organization with ID ${organizationId} successfully updated`);
-
           return 'Organization successfully updated';
         } else {
           this.logger.warn(`No organization found with ID ${organizationId} to update`);
@@ -135,12 +196,19 @@ export class OrganizationsService {
   }
 
   /**
-   * Removes a organization by their ID.
-   * @param {number} organizationId - The ID of the organization to remove.
-   * @returns {Promise<string>} - A promise that resolves to the removed organization entity.
+   * Deletes a organization by their ID.
+   * Only the organization owner can access this handler.
+   * @param {number} organizationId - The ID of the organization to delete.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @throws {UnauthorizedException} - If the user is not authorized to delete the organization.
    * @throws {NotFoundException} - If the organization with the specified ID does not exist.
+   * @throws {Error} - If an error occurs during the deletion process.
+   * @returns {string} - A success message.
    */
-  async remove(organizationId: number) {
+  async deleteOrganization(organizationId: number, requestUserId: number) {
+    // Security check
+    await this.checkIfUserIsOwner(organizationId, requestUserId, 'deleteOrganization');
+
     const organization = await this.organizationsRepo.findOneBy({
       organizationId,
     });
@@ -194,7 +262,7 @@ export class OrganizationsService {
       return new NotFoundException(`User was not found`);
     }
 
-    const organization = await this.findOne(organizationId);
+    const organization = await this.findOneOrganization(organizationId);
     if (!organization) {
       this.logger.error(`Organization ${organizationId} was not found.`);
       return new NotFoundException(`Organization was not found`);
@@ -318,21 +386,7 @@ export class OrganizationsService {
    * @throws {UnauthorizedException} - If the user is not authorized to add a new user.
    */
   async addUserToOrganization(dto: AddUserToOrganizationDto, requestUserId: number) {
-    const { organizationId } = dto;
-
-    const { userType: requestUserType } = await this.organizationUserRepo.findOneBy({
-      organization: { organizationId },
-      user: { userId: requestUserId },
-    });
-
-    // Check if the user is allowed to add
-    if (requestUserType !== UserType.OWNER) {
-      this.logger.warn(
-        `[SECURITY] User ${requestUserId} is trying add a new user to organization ${organizationId}.`,
-      );
-      throw new UnauthorizedException('You do not have permission to do this');
-    }
-
+    await this.checkIfUserIsOwner(dto.organizationId, requestUserId, 'addUserToOrganization');
     return this.createOrganizationUser(dto);
   }
 
@@ -345,7 +399,7 @@ export class OrganizationsService {
    * @throws {UnauthorizedException} - If the user is not authorized to get users.
    */
   async getUsersFromOrganization(organizationId: number, requestUserId: number) {
-    // Check if the user is allowed to get users
+    // Check if the user is in the organization
     const existingUser = await this.organizationUserRepo.findOneBy({
       organization: { organizationId },
       user: { userId: requestUserId },
@@ -353,7 +407,7 @@ export class OrganizationsService {
 
     if (!existingUser) {
       this.logger.warn(
-        `[SECURITY] User ${requestUserId} is trying to get users from organization ${organizationId}.`,
+        `[SECURITY] User ${requestUserId} is trying to get users outside from organization ${organizationId}.`,
       );
       throw new UnauthorizedException('You do not have permission to do this');
     }
@@ -371,26 +425,13 @@ export class OrganizationsService {
    * @throws {UnauthorizedException} - If the user is not authorized to update permissions.
    */
   async updateUserPermission(dto: UpdateOrganizationUserDto, requestUserId: number) {
-    const { organizationId } = dto;
-
-    const { userType: requestUserType } = await this.organizationUserRepo.findOneBy({
-      organization: { organizationId },
-      user: { userId: requestUserId },
-    });
-
-    // Check if the user is allowed to update
-    if (requestUserType !== UserType.OWNER) {
-      this.logger.warn(
-        `[SECURITY] User ${requestUserId} is trying to change permissions from user ${dto.userId}.`,
-      );
-      throw new UnauthorizedException('You do not have permission to do this');
-    }
+    await this.checkIfUserIsOwner(dto.organizationId, requestUserId, 'updateUserPermission');
 
     if (dto.inviteAccepted) {
       this.logger.warn(
-        `[SECURITY] User ${requestUserId} is trying to update inviteAccepted on updateUserInviteStatus`,
+        `[SECURITY] User ${requestUserId} is trying to update inviteAccepted on updateUserPermission`,
       );
-      throw new UnauthorizedException('You do not have permission to do this');
+      throw new UnauthorizedException('You do not have permission to change inviteAccepted');
     }
 
     if (!dto.userType) {
@@ -412,7 +453,7 @@ export class OrganizationsService {
   async updateUserInviteStatus(dto: UpdateOrganizationUserDto, requestUserId: number) {
     if (requestUserId !== dto.userId) {
       this.logger.warn(
-        `[SECURITY] User ${requestUserId} is trying to change permissions from user ${dto.userId}.`,
+        `[SECURITY] User ${requestUserId} is trying to change invite status from user ${dto.userId}.`,
       );
       throw new UnauthorizedException('You do not have permission to do this');
     }
@@ -421,7 +462,7 @@ export class OrganizationsService {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying to update userType on updateUserInviteStatus`,
       );
-      throw new UnauthorizedException('You do not have permission to do this');
+      throw new UnauthorizedException('You do not have permission to change userType');
     }
 
     if (!dto.inviteAccepted) {

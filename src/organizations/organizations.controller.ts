@@ -32,16 +32,6 @@ export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
   /**
-   * Retrieves all organizations.
-   * //FIXME: Only administrators should be able to access this endpoint
-   * @returns {Promise<[]>} - A promise that resolves to an array of organizations.
-   */
-  @Get()
-  findAll() {
-    return this.organizationsService.findAll();
-  }
-
-  /**
    * Retrieves a organization by their ID.
    * Only the organization themselves can access this endpoint.
    * @param {number} id - The ID of the organization to retrieve.
@@ -49,22 +39,29 @@ export class OrganizationsController {
    */
   @Get(':id')
   findOne(@Param('id') id: number) {
-    return this.organizationsService.findOne(id);
+    return this.organizationsService.findOneOrganization(id);
+  }
+
+  /**
+   * Retrieves all organiazations that this user is a member of.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<{}>} - A promise that resolves to the list of organizations.
+   */
+  @Get('/my')
+  findMyOrganizations(@Request() request) {
+    return this.organizationsService.findOrganizationsByUser(+request.user.userId);
   }
 
   /**
    * Creates a new organization.
-   * @param {CreateOrganizationDto} createOrganizationDto - The data transfer object containing organization information.
+   * @param {CreateOrganizationDto} dto - The data transfer object containing organization information.
    * @param {Request} request - The request object containing user information.
-   * @returns {Promise<{}>} - A promise that resolves to the created organization object.
+   * @returns {Promise<{}>} - A promise that resolves to the result of the operation.
    */
   @HttpCode(HttpStatus.CREATED)
   @Post()
-  create(@Body() createOrganizationDto: CreateOrganizationDto, @Request() request) {
-    if (!createOrganizationDto.userCreatedId) {
-      createOrganizationDto.userCreatedId = request.user.userId;
-    }
-    return this.organizationsService.create(createOrganizationDto);
+  create(@Body() dto: CreateOrganizationDto, @Request() request) {
+    return this.organizationsService.createOrganization(dto, +request.user.userId);
   }
 
   /**
@@ -72,22 +69,24 @@ export class OrganizationsController {
    * Only the organization themselves can access this endpoint.
    * @param {number} id - The ID of the organization to update.
    * @param {UpdateOrganizationDto} dto - The data transfer object containing updated organization information.
-   * @returns {Promise<{}>} - A promise that resolves to the updated organization object.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<{}>} - A promise that resolves to the result of the operation.
    */
   @Patch(':id')
-  update(@Param('id') id: number, @Body() dto: UpdateOrganizationDto) {
-    return this.organizationsService.update(+id, dto);
+  update(@Param('id') id: number, @Body() dto: UpdateOrganizationDto, @Request() request) {
+    return this.organizationsService.updateOrganization(+id, +request.user.userId, dto);
   }
 
   /**
    * Deletes a organization by their ID.
    * Only the organization themselves can access this endpoint.
-   * @param {number} id - The ID of the organization to delete.
-   * @returns {Promise<{}>} - A promise that resolves to the deleted organization object.
+   * @param {string} id - The ID of the organization to delete.
+   * @param {Request} request - The request object containing user information.
+   * @returns {Promise<{}>} - A promise that resolves to the result of the operation.
    */
   @Delete(':id')
-  remove(@Param('id') id: number) {
-    return this.organizationsService.remove(id);
+  remove(@Param('id') id: string, @Request() request) {
+    return this.organizationsService.deleteOrganization(+id, +request.user.userId);
   }
 
   /**
@@ -148,8 +147,3 @@ export class OrganizationsController {
     return this.organizationsService.removeUserFromOrganization(options);
   }
 }
-
-// TODO: Enhance organization logic:
-// 1. When a organization is created, organizationUser should be created automatically.
-// 2. And the user who created the organization should be the owner of the organization.
-// 3. When deleting a organization, its organizationUser should be deleted.
