@@ -10,8 +10,8 @@ import { OrganizationEntity } from 'src/organizations/entities/organization.enti
  */
 export enum UserType {
   OWNER = 'owner',
+  WRITE = 'write',
   READ = 'read',
-  VIEWER = 'viewer',
 }
 
 /**
@@ -22,12 +22,20 @@ export class OrganizationUserEntity {
   @PrimaryGeneratedColumn()
   organizationUserId: number;
 
+  @Column() // Foreign Key
+  userId: number;
+
   @ManyToOne(() => UserEntity, (user) => user.organizations)
-  @JoinColumn({ name: 'userId' }) // Foreign key
+  @JoinColumn({ name: 'userId' })
   user: UserEntity;
 
-  @ManyToOne(() => OrganizationEntity, (org) => org.organizationUsers)
-  @JoinColumn({ name: 'organizationId' }) // Foreign key
+  @Column() // Foreign Key
+  organizationId: number;
+
+  @ManyToOne(() => OrganizationEntity, (org) => org.organizationUsers, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'organizationId' })
   organization: OrganizationEntity;
 
   @Column({ type: 'enum', enum: UserType })

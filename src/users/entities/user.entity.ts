@@ -22,6 +22,8 @@ export class UserEntity {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
+  // TODO: Check cascade options for FK's
+
   @OneToMany(() => DocumentEntity, (document) => document.owner)
   documents: DocumentEntity[];
 

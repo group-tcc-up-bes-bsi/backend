@@ -13,13 +13,14 @@ import {
   UserType,
 } from 'src/organizations/entities/organization-user.entity';
 
-describe.skip('OrganizationsController (e2e)', () => {
+describe('E2E - Organizations Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
-  let userIdAux: number;
+  let userId: number;
+  let testOrganizationId: number;
 
-  const organization = {
+  const testOrganization = {
     organizationName: 'Test Org',
     organizationDescription: 'Test Description',
     organizationType: OrganizationType.INDIVIDUAL,
@@ -34,18 +35,18 @@ describe.skip('OrganizationsController (e2e)', () => {
     await app.init();
 
     db = app.get(DataSource);
-
-    await db.getRepository(OrganizationUserEntity).delete({});
-    await db.getRepository(OrganizationEntity).delete({});
-    await db.getRepository(UserEntity).delete({});
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.getRepository(OrganizationUserEntity).clear();
+    await db.getRepository(OrganizationEntity).clear();
+    await db.getRepository(UserEntity).clear();
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
 
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',
     });
-
-    userIdAux = user.userId;
+    userId = user.userId;
 
     authToken = (
       await request(app.getHttpServer())
@@ -54,39 +55,58 @@ describe.skip('OrganizationsController (e2e)', () => {
     ).body.token;
   });
 
+  afterEach(async () => {
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.getRepository(OrganizationUserEntity).clear();
+    await db.getRepository(OrganizationEntity).clear();
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+  });
+
   afterAll(async () => {
     await app.close();
   });
 
-  describe('Create', () => {
+  describe('Create an organization', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer()).post('/organizations').send(organization).expect(401);
+      return request(app.getHttpServer()).post('/organizations').send(testOrganization).expect(401);
     });
 
     it('Organization created successfully', async () => {
       const { body } = await request(app.getHttpServer())
         .post('/organizations')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(organization)
+        .send(testOrganization)
         .expect(201);
+      const { organizationId } = body;
 
+      // Check response body
       expect(body).toMatchObject({
-        message: 'Organization successfully created',
+        message: 'Organization created successfully',
         organizationId: expect.any(Number),
       });
 
+      // Check Organization table in the database.
+      expect(
+        await db.getRepository(OrganizationEntity).findOneBy({ organizationId }),
+      ).toMatchObject({
+        ...testOrganization,
+        organizationId,
+      });
+
+      // Check OrganizationUser table in the database.
       expect(
         await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId: body.organizationId }),
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({ user: { userId }, organization: { organizationId } }),
       ).toMatchObject({
-        ...organization,
-        organizationId: body.organizationId,
-        organizationName: expect.any(String),
-        organizationDescription: expect.any(String),
-        organizationType: OrganizationType.INDIVIDUAL,
+        organizationUserId: expect.any(Number),
+        userType: UserType.OWNER,
+        inviteAccepted: true,
+        userId,
+        organizationId,
       });
     });
+
     it('Missing fields', async () => {
       const { body } = await request(app.getHttpServer())
         .post('/organizations')
@@ -103,39 +123,334 @@ describe.skip('OrganizationsController (e2e)', () => {
     });
   });
 
-  describe('Read - Get all', () => {
-    it('Request without authentication', () => {
-      return request(app.getHttpServer()).get('/organizations').expect(401);
+  describe('Update an organization', () => {
+    beforeEach(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testOrganization)
+        .expect(201);
+      testOrganizationId = body.organizationId;
     });
 
-    it('Get all organizations', async () => {
-      for (let i = 0; i < 2; i++) {
-        await request(app.getHttpServer())
-          .post('/organizations')
-          .set('Authorization', `Bearer ${authToken}`)
-          .send(organization)
-          .expect(201);
-      }
+    it('Request without authentication', () => {
+      return request(app.getHttpServer())
+        .patch(`/organizations/${testOrganizationId}`)
+        .send(testOrganization)
+        .expect(401);
+    });
+
+    it('Organization updated successfully', async () => {
+      const updatedOrg = {
+        organizationName: 'Updated Org',
+        organizationDescription: 'Updated Description',
+        organizationType: OrganizationType.COLLABORATIVE,
+      };
 
       await request(app.getHttpServer())
-        .get('/organizations')
+        .patch(`/organizations/${testOrganizationId}`)
         .set('Authorization', `Bearer ${authToken}`)
+        .send(updatedOrg)
         .expect(200)
-        .expect(({ body }) => {
-          body.forEach((organization) => {
-            expect(organization).toMatchObject({
-              ...organization,
-              organizationId: expect.any(Number),
-              organizationName: expect.any(String),
-              organizationDescription: expect.any(String),
-              organizationType: OrganizationType.INDIVIDUAL,
-            });
-          });
-          expect(body).toHaveLength(3);
+        .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationEntity)
+          .findOneBy({ organizationId: testOrganizationId }),
+      ).toMatchObject({
+        ...updatedOrg,
+        organizationId: testOrganizationId,
+      });
+    });
+
+    it('Organization updated successfully - Only 1 param', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/${testOrganizationId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ organizationName: 'updated organization' })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationEntity)
+          .findOneBy({ organizationId: testOrganizationId }),
+      ).toMatchObject({
+        ...testOrganization,
+        organizationName: 'updated organization',
+      });
+    });
+
+    it('Organization not found', () => {
+      return request(app.getHttpServer())
+        .patch('/organizations/99999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testOrganization)
+        .expect(404);
+    });
+
+    it('Invalid organization type', () => {
+      return request(app.getHttpServer())
+        .patch(`/organizations/${testOrganizationId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ organizationType: 'InvalidType' })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain(
+            'organizationType must be one of the following values: Individual, Collaborative',
+          );
         });
     });
   });
 
+  describe('Delete an organization', () => {
+    beforeEach(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testOrganization)
+        .expect(201);
+      testOrganizationId = body.organizationId;
+    });
+
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).delete(`/organizations/1`).expect(401);
+    });
+
+    it('Organization deleted successfully', async () => {
+      expect(
+        await db
+          .getRepository(OrganizationEntity)
+          .findOneBy({ organizationId: testOrganizationId }),
+      ).toBeDefined();
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({ organization: { organizationId: testOrganizationId } }),
+      ).toBeDefined();
+
+      await request(app.getHttpServer())
+        .delete(`/organizations/${testOrganizationId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization successfully removed'));
+
+      expect(
+        await db
+          .getRepository(OrganizationEntity)
+          .findOneBy({ organizationId: testOrganizationId }),
+      ).toBeNull();
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({ organization: { organizationId: testOrganizationId } }),
+      ).toBeNull();
+    });
+
+    it('Organization not found', () => {
+      return request(app.getHttpServer())
+        .delete('/organizations/99999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+    });
+  });
+
+  describe('Add user to an organization', () => {
+    let newUserId: number;
+    let newOrgUser: object;
+
+    beforeAll(async () => {
+      const { userId: auxUserId } = await db.getRepository(UserEntity).save({
+        username: 'new_john',
+        password: '1234',
+        email: 'newTest@example.com',
+      });
+      newUserId = auxUserId;
+    });
+
+    beforeEach(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...testOrganization,
+          organizationType: OrganizationType.COLLABORATIVE,
+        })
+        .expect(201);
+      testOrganizationId = body.organizationId;
+
+      newOrgUser = {
+        userId: newUserId,
+        organizationId: testOrganizationId,
+        userType: UserType.OWNER,
+      };
+    });
+
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).post('/organizations/addUser').expect(401);
+    });
+
+    it('User added successfully - OWNER', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(newOrgUser)
+        .expect(201)
+        .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
+
+      expect(
+        await db.getRepository(OrganizationUserEntity).find({
+          where: {
+            organization: { organizationId: testOrganizationId },
+          },
+        }),
+      ).toMatchObject([
+        {
+          organizationUserId: expect.any(Number),
+          userId: userId,
+          organizationId: testOrganizationId,
+          userType: UserType.OWNER,
+          inviteAccepted: true,
+        },
+        {
+          ...newOrgUser,
+          organizationUserId: expect.any(Number),
+          inviteAccepted: false,
+        },
+      ]);
+    });
+
+    it('User added successfully - WRITE', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(201)
+        .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
+
+      expect(
+        await db.getRepository(OrganizationUserEntity).find({
+          where: {
+            organization: { organizationId: testOrganizationId },
+          },
+        }),
+      ).toMatchObject([
+        {
+          organizationUserId: expect.any(Number),
+          userId: userId,
+          organizationId: testOrganizationId,
+          userType: UserType.OWNER,
+          inviteAccepted: true,
+        },
+        {
+          ...newOrgUser,
+          organizationUserId: expect.any(Number),
+          userType: UserType.WRITE,
+          inviteAccepted: false,
+        },
+      ]);
+    });
+
+    it('User added successfully - READ', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.READ,
+        })
+        .expect(201)
+        .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
+
+      expect(
+        await db.getRepository(OrganizationUserEntity).find({
+          where: {
+            organization: { organizationId: testOrganizationId },
+          },
+        }),
+      ).toMatchObject([
+        {
+          organizationUserId: expect.any(Number),
+          userId: userId,
+          organizationId: testOrganizationId,
+          userType: UserType.OWNER,
+          inviteAccepted: true,
+        },
+        {
+          ...newOrgUser,
+          organizationUserId: expect.any(Number),
+          userType: UserType.READ,
+          inviteAccepted: false,
+        },
+      ]);
+    });
+
+    it('User not added - Organization not found', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          organizationId: 9999,
+        })
+        .expect(404)
+        .expect(({ body }) => expect(body.message).toBe('Organization not found'));
+    });
+
+    it('User not added - User not found', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userId: 9999,
+        })
+        .expect(404)
+        .expect(({ body }) => expect(body.message).toBe('User not found'));
+    });
+
+    it('User not added - Organization is Individual', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testOrganization)
+        .expect(201);
+      const indivOrgId = body.organizationId;
+
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          organizationId: indivOrgId,
+        })
+        .expect(400)
+        .expect(({ body }) => expect(body.message).toBe('This organization is individual'));
+    });
+
+    it('Missing required fields', async () => {
+      await request(app.getHttpServer())
+        .post('/organizations/addUser')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({})
+        .expect(400)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: [
+              'organizationId must be a number conforming to the specified constraints',
+              'userId must be a number conforming to the specified constraints',
+              'userType must be one of the following values: owner, write, read',
+            ],
+          });
+        });
+    });
+  });
+
+  /*
   describe('Read - Get one', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).get('/organizations/1').expect(401);
@@ -172,124 +487,6 @@ describe.skip('OrganizationsController (e2e)', () => {
         });
     });
   });
-
-  describe('Update', () => {
-    it('Request without authentication', () => {
-      return request(app.getHttpServer()).patch(`/organizations/1`).send(organization).expect(401);
-    });
-
-    it('Organization updated successfully', async () => {
-      const organizationId = (
-        await request(app.getHttpServer())
-          .post(`/organizations`)
-          .set('Authorization', `Bearer ${authToken}`)
-          .send(organization)
-          .expect(201)
-      ).body.organizationId;
-
-      const newOrganization = {
-        organizationName: 'My organization',
-        organizationDescription: 'Test Description',
-        organizationType: OrganizationType.INDIVIDUAL,
-      };
-
-      await request(app.getHttpServer())
-        .patch(`/organizations/${organizationId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(newOrganization)
-        .expect(200)
-        .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
-      expect(
-        await db.getRepository(OrganizationEntity).findOneBy({ organizationId }),
-      ).toMatchObject({
-        ...newOrganization,
-        organizationId,
-        organizationName: expect.any(String),
-        organizationDescription: expect.any(String),
-      });
-    });
-
-    it('Organization updated successfully - Only 1 param', async () => {
-      const organizationId = (
-        await request(app.getHttpServer())
-          .post(`/organizations`)
-          .set('Authorization', `Bearer ${authToken}`)
-          .send(organization)
-          .expect(201)
-      ).body.organizationId;
-
-      await request(app.getHttpServer())
-        .patch(`/organizations/${organizationId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ organizationName: 'updated organization' })
-        .expect(200)
-        .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
-
-      expect(
-        await db.getRepository(OrganizationEntity).findOneBy({ organizationId }),
-      ).toMatchObject({
-        ...organization,
-        organizationName: 'updated organization',
-        organizationId,
-        organizationDescription: expect.any(String),
-        organizationType: OrganizationType.INDIVIDUAL,
-      });
-    });
-
-    it('Organization not found', () => {
-      return request(app.getHttpServer())
-        .patch('/organizations/99999')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(organization)
-        .expect(404);
-    });
-
-    it('Invalid organization type', () => {
-      return request(app.getHttpServer())
-        .patch(`/organizations/1`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ organizationType: 'InvalidType' })
-        .expect(400)
-        .expect((res) => {
-          expect(res.body.message).toContain(
-            'organizationType must be one of the following values: Individual, Collaborative',
-          );
-        });
-    });
-  });
-
-  describe('Delete', () => {
-    it('Request without authentication', () => {
-      return request(app.getHttpServer()).delete(`/organizations/1`).set(organization).expect(401);
-    });
-
-    it('Organization deleted successfully', async () => {
-      const organizationId = (
-        await request(app.getHttpServer())
-          .post(`/organizations`)
-          .set('Authorization', `Bearer ${authToken}`)
-          .send(organization)
-          .expect(201)
-      ).body.organizationId;
-
-      await request(app.getHttpServer())
-        .delete(`/organizations/${organizationId}`)
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({ organizationName: 'updated organization' })
-        .expect(200)
-        .expect(({ text }) => expect(text).toBe('Organization successfully removed'));
-      expect(await db.getRepository(OrganizationEntity).findOneBy({ organizationId })).toBeNull();
-    });
-
-    it('Organization not found', () => {
-      return request(app.getHttpServer())
-        .delete('/organizations/99999')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(404);
-    });
-  });
-
-  /*Organization Users*/
 
   describe('Read - Get all organization users', () => {
     let organizationId: number;
@@ -362,7 +559,7 @@ describe.skip('OrganizationsController (e2e)', () => {
     });
   });
 
-  describe('Create Organization User', () => {
+  describe('Add user to an organization', () => {
     it('Request without authentication', () => {
       const orgUserData = {
         userId: 1,
@@ -431,6 +628,18 @@ describe.skip('OrganizationsController (e2e)', () => {
           'userType must be one of the following values: owner, read, viewer',
         ],
       });
+    });
+  });
+
+  describe('Update user permissions', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch(`/organizations/updateUser/permission`).expect(401);
+    });
+  });
+
+  describe('Update user invite status', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch(`/organizations/updateUser/invite`).expect(401);
     });
   });
 
@@ -518,7 +727,7 @@ describe.skip('OrganizationsController (e2e)', () => {
     });
   });
 
-  describe('Delete Organization User', () => {
+  describe('Remove user from an organization', () => {
     let organizationId: number;
 
     beforeAll(async () => {
@@ -607,5 +816,5 @@ describe.skip('OrganizationsController (e2e)', () => {
           expect(res.body.message).toMatch(/not a member|permission/gi);
         });
     });
-  });
+  });*/
 });

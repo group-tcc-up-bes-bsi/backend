@@ -4,10 +4,8 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
-import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
 
-describe('Auth Controller (e2e)', () => {
+describe('E2E - Auth Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
 
@@ -20,9 +18,9 @@ describe('Auth Controller (e2e)', () => {
     await app.init();
 
     db = app.get(DataSource);
-    await db.getRepository(OrganizationUserEntity).delete({});
-    await db.getRepository(OrganizationEntity).delete({});
-    await db.getRepository(UserEntity).delete({});
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.getRepository(UserEntity).clear();
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
     await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',

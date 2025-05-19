@@ -1,7 +1,18 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateOrganizationDto } from './create-organization.dto';
-
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { OrganizationType } from '../entities/organization.entity';
 /**
  * Data Transfer Object for updating a organization.
  */
-export class UpdateOrganizationDto extends PartialType(CreateOrganizationDto) {}
+export class UpdateOrganizationDto {
+  @IsOptional()
+  @IsString()
+  organizationName: string;
+
+  @IsOptional()
+  @IsString()
+  organizationDescription: string;
+
+  @IsOptional()
+  @IsEnum(OrganizationType)
+  organizationType: OrganizationType;
+}

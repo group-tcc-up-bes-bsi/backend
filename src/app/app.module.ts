@@ -46,8 +46,14 @@ globalThis.crypto = {
   ],
   providers: [
     {
+      // Global validation pipe, to validate incoming requests.
       provide: APP_PIPE,
-      useClass: ValidationPipe,
+      useFactory: () =>
+        new ValidationPipe({
+          transform: true,
+          whitelist: true,
+          forbidNonWhitelisted: true,
+        }),
     },
   ],
 })
