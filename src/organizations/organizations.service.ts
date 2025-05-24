@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -56,7 +57,7 @@ export class OrganizationsService {
       })
       .then((user) => {
         if (!user) {
-          throw new NotFoundException('Organization not found');
+          throw new ForbiddenException('The request user is not part of this organization');
         }
 
         if (user?.userType !== UserType.OWNER) {
@@ -333,14 +334,16 @@ export class OrganizationsService {
    * @throws {Error} - If an error occurs during the update process.
    */
   private async updateOrganizationUser(dto: UpdateOrganizationUserDto) {
-    const { organizationUserId } = await this.organizationUserRepo.findOneBy({
+    const organizationUser = await this.organizationUserRepo.findOneBy({
       organization: { organizationId: dto.organizationId },
       user: { userId: dto.userId },
     });
 
-    if (!organizationUserId) {
+    if (!organizationUser) {
       throw new NotFoundException('User not found in the organization');
     }
+
+    const { organizationUserId } = organizationUser;
 
     return this.organizationUserRepo
       .update(organizationUserId, dto)

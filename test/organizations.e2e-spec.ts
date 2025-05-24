@@ -17,7 +17,9 @@ describe('E2E - Organizations Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
+  let authToken2: string;
   let userId: number;
+  let userId2: number;
   let testOrganizationId: number;
 
   const testOrganization = {
@@ -52,6 +54,19 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'test@example.com', password: '123' })
+    ).body.token;
+
+    const user2 = await db.getRepository(UserEntity).save({
+      username: 'new_john',
+      password: '1234',
+      email: 'newTest@example.com',
+    });
+    userId2 = user2.userId;
+
+    authToken2 = (
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'newTest@example.com', password: '1234' })
     ).body.token;
   });
 
@@ -257,17 +272,7 @@ describe('E2E - Organizations Endpoints', () => {
   });
 
   describe('Add user to an organization', () => {
-    let newUserId: number;
     let newOrgUser: object;
-
-    beforeAll(async () => {
-      const { userId: auxUserId } = await db.getRepository(UserEntity).save({
-        username: 'new_john',
-        password: '1234',
-        email: 'newTest@example.com',
-      });
-      newUserId = auxUserId;
-    });
 
     beforeEach(async () => {
       const { body } = await request(app.getHttpServer())
@@ -281,7 +286,7 @@ describe('E2E - Organizations Endpoints', () => {
       testOrganizationId = body.organizationId;
 
       newOrgUser = {
-        userId: newUserId,
+        userId: userId2,
         organizationId: testOrganizationId,
         userType: UserType.OWNER,
       };
@@ -397,8 +402,10 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUser,
           organizationId: 9999,
         })
-        .expect(404)
-        .expect(({ body }) => expect(body.message).toBe('Organization not found'));
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body.message).toBe('The request user is not part of this organization'),
+        );
     });
 
     it('User not added - User not found', async () => {
@@ -432,6 +439,38 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(({ body }) => expect(body.message).toBe('This organization is individual'));
     });
 
+    it('User not added - The request user is not in the organization', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send(newOrgUser)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body.message).toBe('The request user is not part of this organization'),
+        );
+    });
+
+    it('User not added - The request user is not the owner', async () => {
+      // User added to the organization, with write perms
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(201)
+        .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
+
+      // Send the request as the write user
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send(newOrgUser)
+        .expect(401)
+        .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
+    });
+
     it('Missing required fields', async () => {
       await request(app.getHttpServer())
         .post('/organizations/addUser')
@@ -447,6 +486,357 @@ describe('E2E - Organizations Endpoints', () => {
             ],
           });
         });
+    });
+  });
+
+  describe('Update user permissions', () => {
+    let newOrgUser: object;
+
+    beforeEach(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...testOrganization,
+          organizationType: OrganizationType.COLLABORATIVE,
+        })
+        .expect(201);
+      testOrganizationId = body.organizationId;
+
+      newOrgUser = {
+        userId: userId2,
+        organizationId: testOrganizationId,
+        userType: UserType.OWNER,
+      };
+    });
+
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch(`/organizations/updateUser/permission`).expect(401);
+    });
+
+    it('User permission changed from READ to WRITE', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.READ,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.WRITE,
+        })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({
+            organizationId: testOrganizationId,
+            userId: userId2,
+          })
+          .then((res) => res.userType),
+      ).toBe(UserType.WRITE);
+    });
+
+    it('User permission changed from READ to OWNER', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.READ,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.OWNER,
+        })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({
+            organizationId: testOrganizationId,
+            userId: userId2,
+          })
+          .then((res) => res.userType),
+      ).toBe(UserType.OWNER);
+    });
+
+    it('User permission changed from WRITE to READ', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.READ,
+        })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({
+            organizationId: testOrganizationId,
+            userId: userId2,
+          })
+          .then((res) => res.userType),
+      ).toBe(UserType.READ);
+    });
+
+    it('User permission changed from WRITE to OWNER', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.OWNER,
+        })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({
+            organizationId: testOrganizationId,
+            userId: userId2,
+          })
+          .then((res) => res.userType),
+      ).toBe(UserType.OWNER);
+    });
+
+    it('User permission changed from OWNER to READ', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.OWNER,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.READ,
+        })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({
+            organizationId: testOrganizationId,
+            userId: userId2,
+          })
+          .then((res) => res.userType),
+      ).toBe(UserType.READ);
+    });
+
+    it('User permission changed from OWNER to WRITE', async () => {
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.OWNER,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.WRITE,
+        })
+        .expect(200)
+        .expect(({ text }) => expect(text).toBe('Organization user successfully updated'));
+
+      expect(
+        await db
+          .getRepository(OrganizationUserEntity)
+          .findOneBy({
+            organizationId: testOrganizationId,
+            userId: userId2,
+          })
+          .then((res) => res.userType),
+      ).toBe(UserType.WRITE);
+    });
+
+    it('User permission not changed - Organization not found', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: 99999,
+          userId: userId2,
+          userType: UserType.READ,
+        })
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body.message).toBe('The request user is not part of this organization'),
+        );
+    });
+
+    it('User permission not changed - User not found', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: 99999,
+          userType: UserType.READ,
+        })
+        .expect(404)
+        .expect(({ body }) => expect(body.message).toBe('User not found in the organization'));
+    });
+
+    it('User permission not changed - Invalid user type', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: 'invalidType',
+        })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain(
+            'userType must be one of the following values: owner, write, read',
+          );
+        });
+    });
+
+    it('User permission not changed - User type is empty', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+        })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain('New user permission must be provided');
+        });
+    });
+
+    it('User permission not changed - Invite status sent', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          organizationId: testOrganizationId,
+          userId: userId2,
+          userType: UserType.OWNER,
+          inviteAccepted: true,
+        })
+        .expect(401)
+        .expect((res) => {
+          expect(res.body.message).toContain('You do not have permission to change inviteAccepted');
+        });
+    });
+
+    it('User permission not changed - Body is empty', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({})
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toMatchObject([
+            'organizationId must be a number conforming to the specified constraints',
+            'userId must be a number conforming to the specified constraints',
+          ]);
+        });
+    });
+
+    it('User not added - The request user is not in the organization', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body.message).toBe('The request user is not part of this organization'),
+        );
+    });
+
+    it('User not added - The request user is not the owner', async () => {
+      // User added to the organization, with write perms
+      await request(app.getHttpServer())
+        .post(`/organizations/addUser`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(201)
+        .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
+
+      // Send the request as the write user
+      await request(app.getHttpServer())
+        .patch(`/organizations/updateUser/permission`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send({
+          ...newOrgUser,
+          userType: UserType.WRITE,
+        })
+        .expect(401)
+        .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
+    });
+  });
+
+  describe('Update user invite status', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch(`/organizations/updateUser/invite`).expect(401);
     });
   });
 
