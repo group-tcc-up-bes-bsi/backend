@@ -12,7 +12,7 @@ import { Repository } from 'typeorm';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UsersService } from 'src/users/users.service';
-import { AddUserToOrganizationDto } from './dto/addUserToOrganization.dto';
+import { CreateOrganizationUserDto } from './dto/create-organizationUser.dto';
 import { OrganizationUserEntity, UserType } from './entities/organization-user.entity';
 import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto';
 
@@ -217,6 +217,11 @@ export class OrganizationsService {
    * @returns {string} - A success message.
    */
   async deleteOrganization(organizationId: number, requestUserId: number) {
+    if (isNaN(organizationId)) {
+      this.logger.warn(`Invalid organizationId ${organizationId} provided for deletion`);
+      throw new BadRequestException('Invalid organizationId provided');
+    }
+
     const organization = await this.organizationsRepo.findOneBy({
       organizationId,
     });
@@ -245,14 +250,14 @@ export class OrganizationsService {
 
   /**
    * Creates a new organization user.
-   * @param {AddUserToOrganizationDto} dto - The data transfer object containing organization user information.
+   * @param {CreateOrganizationUserDto} dto - The data transfer object containing organization user information.
    * @param {boolean} isFirstUser - True if this was called on createOrganization.
    * @returns {string} - A success message.
    * @throws {NotFoundException} - If the user is not found.
    * @throws {Error} - If an error occurs during the save process.
    */
   private async createOrganizationUser(
-    dto: AddUserToOrganizationDto,
+    dto: CreateOrganizationUserDto,
     isFirstUser: boolean = false,
   ) {
     const { userId, organizationId, userType } = dto;
@@ -397,12 +402,12 @@ export class OrganizationsService {
   /**
    * Adds a user to an organization.
    * Only the organization owner can access this resource.
-   * @param {AddUserToOrganizationDto} dto - The data transfer object containing organization user information.
+   * @param {CreateOrganizationUserDto} dto - The data transfer object containing organization user information.
    * @param {number} requestUserId - The ID of the user making the request.
    * @returns {Promise<string>} - A promise that resolves to a success message.
    * @throws {UnauthorizedException} - If the user is not authorized to add a new user.
    */
-  async addUserToOrganization(dto: AddUserToOrganizationDto, requestUserId: number) {
+  async addUserToOrganization(dto: CreateOrganizationUserDto, requestUserId: number) {
     await this.checkIfUserIsOwner(requestUserId, dto.organizationId, 'addUserToOrganization');
     return this.createOrganizationUser(dto);
   }
@@ -501,13 +506,13 @@ export class OrganizationsService {
   async removeUserFromOrganization(options) {
     const { orgId, userId, requestUserId } = options;
 
-    const { userType: requestUserType } = await this.organizationUserRepo.findOneBy({
+    const requestUser = await this.organizationUserRepo.findOneBy({
       organization: { organizationId: orgId },
       user: { userId: requestUserId },
     });
 
     // Check if the user is allowed to delete
-    if (requestUserId !== userId || requestUserType !== UserType.OWNER) {
+    if (requestUserId !== userId && requestUser?.userType !== UserType.OWNER) {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying to remove user ${userId} from organization ${orgId}`,
       );

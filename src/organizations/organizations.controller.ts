@@ -15,7 +15,7 @@ import { OrganizationsService } from './organizations.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
-import { AddUserToOrganizationDto } from './dto/addUserToOrganization.dto';
+import { CreateOrganizationUserDto } from './dto/create-organizationUser.dto';
 import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto';
 
 /**
@@ -92,12 +92,12 @@ export class OrganizationsController {
   /**
    * Adds a user to an organization.
    * Only the organization owner can access this endpoint.
-   * @param {AddUserToOrganizationDto} dto - Add user to organization data transfer object.
+   * @param {CreateOrganizationUserDto} dto - Add user to organization data transfer object.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<any>} - A promise that resolves to the result of the operation.
    */
   @Post('addUser')
-  addUserToOrganization(@Body() dto: AddUserToOrganizationDto, @Request() request) {
+  addUserToOrganization(@Body() dto: CreateOrganizationUserDto, @Request() request) {
     return this.organizationsService.addUserToOrganization(dto, +request.user.userId);
   }
 
@@ -122,7 +122,7 @@ export class OrganizationsController {
    */
   @Patch('updateUser/invite')
   updateUserInviteStatus(@Body() dto: UpdateOrganizationUserDto, @Request() request) {
-    return this.organizationsService.updateUserPermission(dto, +request.user.userId);
+    return this.organizationsService.updateUserInviteStatus(dto, +request.user.userId);
   }
 
   /**
