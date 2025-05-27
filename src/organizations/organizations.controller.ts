@@ -32,23 +32,24 @@ export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
   /**
-   * Retrieves a organization by their ID.
-   * Only the organization themselves can access this endpoint.
+   * Get organization data.
+   * Only organization members can access this endpoint.
    * @param {number} id - The ID of the organization to retrieve.
+   * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the organization object.
    */
-  @Get(':id')
-  findOne(@Param('id') id: number) {
-    return this.organizationsService.findOneOrganization(id);
+  @Get('data/:id')
+  getOrganizationData(@Param('id') id: number, @Request() request) {
+    return this.organizationsService.getOrganizationData(id, +request.user.userId);
   }
 
   /**
-   * Retrieves all organiazations that this user is a member of.
+   * Retrieves all organizations that this user is a member of.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the list of organizations.
    */
   @Get('/my')
-  findMyOrganizations(@Request() request) {
+  getMyOrganizations(@Request() request) {
     return this.organizationsService.findOrganizationsByUser(+request.user.userId);
   }
 

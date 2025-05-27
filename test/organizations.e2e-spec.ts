@@ -86,6 +86,7 @@ describe('E2E - Organizations Endpoints', () => {
   });
 
   afterEach(async () => {
+    testOrganizationId = null;
     await db.query('SET FOREIGN_KEY_CHECKS = 0');
     await db.getRepository(OrganizationUserEntity).clear();
     await db.getRepository(OrganizationEntity).clear();
@@ -1162,6 +1163,167 @@ describe('E2E - Organizations Endpoints', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(400)
         .expect(({ body }) => expect(body.message).toBe('Invalid organizationId provided'));
+    });
+  });
+
+  describe('Get my organizations', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).get('/organizations/my').expect(401);
+    });
+
+    it('Get my organizations successfully', async () => {
+      const indivOrgs = await Promise.all(
+        [...Array(3)].map(() =>
+          request(app.getHttpServer())
+            .post('/organizations')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(testOrganization)
+            .expect(201)
+            .then((res) => res.body.organizationId),
+        ),
+      );
+
+      const collabOrgs = await Promise.all(
+        [...Array(3)].map(() =>
+          request(app.getHttpServer())
+            .post('/organizations')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({ ...testOrganization, organizationType: OrganizationType.COLLABORATIVE })
+            .expect(201)
+            .then((res) => res.body.organizationId),
+        ),
+      );
+
+      const allOrgIds = [...indivOrgs, ...collabOrgs];
+
+      const { body } = await request(app.getHttpServer())
+        .get('/organizations/my')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(body).toHaveLength(6);
+
+      body.forEach((organization) => {
+        expect([OrganizationType.INDIVIDUAL, OrganizationType.COLLABORATIVE]).toContain(
+          organization.organizationType,
+        );
+
+        expect(allOrgIds).toContain(organization.organizationId);
+
+        expect(organization).toStrictEqual({
+          organizationId: expect.any(Number),
+          organizationType: expect.any(String),
+          organizationName: testOrganization.organizationName,
+          organizationDescription: testOrganization.organizationDescription,
+        });
+      });
+    });
+
+    it('No organizations found', () => {
+      return request(app.getHttpServer())
+        .get('/organizations/my')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect((res) => {
+          expect(res.body.message).toBe('No organizations found for this user');
+        });
+    });
+  });
+
+  describe('Get organization data', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).get('/organizations/data/1').expect(401);
+    });
+
+    it('Get organization data successfully', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...testOrganization,
+          organizationType: OrganizationType.COLLABORATIVE,
+        })
+        .expect(201);
+      testOrganizationId = body.organizationId;
+
+      await request(app.getHttpServer())
+        .post('/organizations/addUser')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          userId: userId2,
+          organizationId: testOrganizationId,
+          userType: UserType.READ,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/organizations/addUser')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          userId: userId3,
+          organizationId: testOrganizationId,
+          userType: UserType.WRITE,
+        })
+        .expect(201);
+
+      const { body: orgData } = await request(app.getHttpServer())
+        .get(`/organizations/data/${testOrganizationId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(orgData).toStrictEqual({
+        organizationId: 1,
+        organizationName: 'Test Org',
+        organizationDescription: 'Test Description',
+        organizationType: 'Collaborative',
+        organizationUsers: [
+          {
+            user: 'john_doe',
+            userType: 'owner',
+            inviteAccepted: true,
+          },
+          {
+            user: 'new_john',
+            userType: 'read',
+            inviteAccepted: false,
+          },
+          {
+            user: 'jane_doe',
+            userType: 'write',
+            inviteAccepted: false,
+          },
+        ],
+      });
+    });
+
+    it('Request from an user outside of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          ...testOrganization,
+          organizationType: OrganizationType.COLLABORATIVE,
+        })
+        .expect(201);
+      testOrganizationId = body.organizationId;
+
+      await request(app.getHttpServer())
+        .get(`/organizations/data/${testOrganizationId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body.message).toBe('The request user is not part of this organization');
+        });
+    });
+
+    it('Organization not found', () => {
+      return request(app.getHttpServer())
+        .get('/organizations/data/99999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body.message).toBe('The request user is not part of this organization'),
+        );
     });
   });
 });

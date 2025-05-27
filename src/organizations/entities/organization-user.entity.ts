@@ -17,7 +17,7 @@ export enum UserType {
 /**
  * Entity representing the structure of the organizations-users table in the database.
  */
-@Entity('organizationUsers')
+@Entity('organization_users')
 export class OrganizationUserEntity {
   @PrimaryGeneratedColumn()
   organizationUserId: number;

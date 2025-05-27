@@ -42,14 +42,13 @@ export class OrganizationsService {
   ///////////////////////////////////////////////////////////////////////
 
   /**
-   * Checks if the user is the owner of the organization.
+   * Check if user exists in the organization.
    * @param {number} userId - The ID of the user to check.
    * @param {number} organizationId - The ID of the organization to check.
-   * @param {string} context - Function name that is calling this function.
-   * @throws {UnauthorizedException} - If the user is not the owner of the organization.
-   * @returns {Promise<void>} - A promise that resolves if the user is the owner.
+   * @returns {Promise<OrganizationUserEntity>} - A promise that resolves to the organization user entity if found.
+   * @throws {ForbiddenException} - If the user is not part of the organization.
    */
-  private async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
+  private checkIfUserExistsOnOrganization(userId: number, organizationId: number) {
     return this.organizationUserRepo
       .findOneBy({
         organizationId,
@@ -59,18 +58,53 @@ export class OrganizationsService {
         if (!user) {
           throw new ForbiddenException('The request user is not part of this organization');
         }
-
-        if (user?.userType !== UserType.OWNER) {
-          this.logger.warn(
-            `[SECURITY] User ${userId} is trying to update organization ${organizationId} via ${context}`,
-          );
-          throw new UnauthorizedException('You do not have permission to do this');
-        }
+        return user;
       });
   }
 
+  /**
+   * Checks if the user is the owner of the organization.
+   * @param {number} userId - The ID of the user to check.
+   * @param {number} organizationId - The ID of the organization to check.
+   * @param {string} context - Function name that is calling this function.
+   * @throws {UnauthorizedException} - If the user is not the owner of the organization.
+   * @returns {Promise<void>} - A promise that resolves if the user is the owner.
+   */
+  private async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
+    const user = await this.checkIfUserExistsOnOrganization(userId, organizationId);
+
+    if (user?.userType !== UserType.OWNER) {
+      this.logger.warn(
+        `[SECURITY] User ${userId} is trying to update organization ${organizationId} via ${context}`,
+      );
+      throw new UnauthorizedException('You do not have permission to do this');
+    }
+  }
+
   ///////////////////////////////////////////////////////////////////////
-  // Public OrganizationUsers interfaces
+  // Private Organization functions
+  ///////////////////////////////////////////////////////////////////////
+
+  /**
+   * Retrieves a organization by their ID.
+   * @param {number} organizationId - The ID of the organization to retrieve.
+   * @returns {OrganizationEntity} - The organization entity if found.
+   */
+  private async findOneOrganization(organizationId: number) {
+    const organization = await this.organizationsRepo.findOne({
+      where: { organizationId },
+      relations: ['organizationUsers'],
+    });
+
+    if (!organization) {
+      this.logger.warn(`Organization with ID ${organizationId} not found`);
+      throw new NotFoundException('Organization not found');
+    }
+    return organization;
+  }
+
+  ///////////////////////////////////////////////////////////////////////
+  // Public Organization interfaces
   ///////////////////////////////////////////////////////////////////////
 
   /**
@@ -103,51 +137,6 @@ export class OrganizationsService {
       message: 'Organization created successfully',
       organizationId,
     };
-  }
-
-  /**
-   * Retrieves a organization by their ID.
-   * @param {number} organizationId - The ID of the organization to retrieve.
-   * @returns {OrganizationEntity} - The organization entity if found.
-   */
-  async findOneOrganization(organizationId: number) {
-    const organization = await this.organizationsRepo.findOneBy({
-      organizationId,
-    });
-    if (!organization) {
-      this.logger.warn(`Organization with ID ${organizationId} not found`);
-      throw new NotFoundException('Organization not found');
-    }
-    return organization;
-  }
-
-  /**
-   * Retrieves all organizations for a specific user.
-   * @param {number} userId - The ID of the user to retrieve organizations for.
-   * @returns {Promise<[]>} - A promise that resolves to an array of organization entities.
-   * @throws {NotFoundException} - If no organizations are found for the user.
-   * @throws {Error} - If an error occurs during the retrieval process.
-   */
-  findOrganizationsByUser(userId: number) {
-    return this.organizationUserRepo
-      .find({
-        where: { user: { userId } },
-        relations: ['organization'],
-      })
-      .then((orgUsers) => {
-        if (!orgUsers || orgUsers.length === 0) {
-          this.logger.warn(`No organizations found for user with ID ${userId}`);
-          throw new NotFoundException('No organizations found for this user');
-        }
-        return orgUsers.map((orgUser) => orgUser.organization);
-      })
-      .catch((e) => {
-        if (e.name === 'NotFoundException') {
-          throw e;
-        }
-        this.logger.error(`Error retrieving organizations for user with ID ${userId}`, e.stack);
-        throw new Error('Error retrieving organizations');
-      });
   }
 
   /**
@@ -244,9 +233,33 @@ export class OrganizationsService {
     }
   }
 
-  //////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////
   // Private OrganizationUsers functions
   ///////////////////////////////////////////////////////////////////////
+
+  /**
+   * Retrieves all organization users for a specific organization ID.
+   * @param {number} organizationId - The ID of the organization to retrieve users for.
+   * @returns {Promise<object[]>} - A promise that resolves to an array of organization user entities.
+   * @throws {NotFoundException} - If no users are found for the organization.
+   */
+  private async findAllOrganizationUser(organizationId: number) {
+    const organizationUsers = await this.organizationUserRepo.find({
+      where: { organization: { organizationId } },
+      relations: ['user'],
+    });
+
+    if (!organizationUsers || organizationUsers.length === 0) {
+      this.logger.debug(`No users found for organization with ID ${organizationId}`);
+      throw new NotFoundException('No users found for this organization');
+    }
+
+    return organizationUsers.map((orgUser) => ({
+      user: orgUser.user.username,
+      userType: orgUser.userType,
+      inviteAccepted: orgUser.inviteAccepted,
+    }));
+  }
 
   /**
    * Creates a new organization user.
@@ -305,30 +318,6 @@ export class OrganizationsService {
         this.logger.error(`Error saving organizationUser: ${error.stack}`);
         throw new Error('Error adding user to the organization');
       });
-  }
-
-  /**
-   * Retrieves all organization users for a specific organization ID.
-   * @param {number} organizationId - The ID of the organization to retrieve users for.
-   * @returns {Promise<object[]>} - A promise that resolves to an array of organization user entities.
-   * @throws {NotFoundException} - If no users are found for the organization.
-   */
-  private async findAllOrganizationUser(organizationId: number) {
-    const organizationUsers = await this.organizationUserRepo.find({
-      where: { organization: { organizationId } },
-      relations: ['user'],
-    });
-
-    if (!organizationUsers || organizationUsers.length === 0) {
-      this.logger.debug(`No users found for organization with ID ${organizationId}`);
-      throw new NotFoundException('No users found for this organization');
-    }
-
-    return organizationUsers.map((orgUser) => ({
-      user: orgUser.user.username,
-      userType: orgUser.userType,
-      inviteAccepted: orgUser.inviteAccepted,
-    }));
   }
 
   /**
@@ -395,7 +384,7 @@ export class OrganizationsService {
     }
   }
 
-  //////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////
   // Public OrganizationUsers interfaces
   ///////////////////////////////////////////////////////////////////////
 
@@ -410,31 +399,6 @@ export class OrganizationsService {
   async addUserToOrganization(dto: CreateOrganizationUserDto, requestUserId: number) {
     await this.checkIfUserIsOwner(requestUserId, dto.organizationId, 'addUserToOrganization');
     return this.createOrganizationUser(dto);
-  }
-
-  /**
-   * Retrieves all users from an organization.
-   * Only the organization users themselves can access this handler.
-   * @param {number} organizationId - The ID of the organization to retrieve users for.
-   * @param {number} requestUserId - The ID of the user making the request.
-   * @returns {Promise<object[]>} - A promise that resolves to an array of organization user entities.
-   * @throws {UnauthorizedException} - If the user is not authorized to get users.
-   */
-  async getUsersFromOrganization(organizationId: number, requestUserId: number) {
-    // Check if the user is in the organization
-    const existingUser = await this.organizationUserRepo.findOneBy({
-      organization: { organizationId },
-      user: { userId: requestUserId },
-    });
-
-    if (!existingUser) {
-      this.logger.warn(
-        `[SECURITY] User ${requestUserId} is trying to get users outside from organization ${organizationId}.`,
-      );
-      throw new UnauthorizedException('You do not have permission to do this');
-    }
-
-    return this.findAllOrganizationUser(organizationId);
   }
 
   /**
@@ -520,5 +484,61 @@ export class OrganizationsService {
     }
 
     return this.removeOrganizationUser(orgId, userId);
+  }
+
+  ///////////////////////////////////////////////////////////////////////
+  // Public Getters
+  ///////////////////////////////////////////////////////////////////////
+
+  /**
+   * Retrieves all organizations for a specific user.
+   * @param {number} userId - The ID of the user to retrieve organizations for.
+   * @returns {Promise<[]>} - A promise that resolves to an array of organization entities.
+   * @throws {NotFoundException} - If no organizations are found for the user.
+   * @throws {Error} - If an error occurs during the retrieval process.
+   */
+  findOrganizationsByUser(userId: number) {
+    return this.organizationUserRepo
+      .find({
+        where: { userId },
+        relations: ['organization'],
+      })
+      .then((orgUsers) => {
+        if (!orgUsers || orgUsers.length === 0) {
+          this.logger.warn(`No organizations found for user with ID ${userId}`);
+          throw new NotFoundException('No organizations found for this user');
+        }
+        return orgUsers.map((orgUser) => orgUser.organization);
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error retrieving organizations for user with ID ${userId}`, e.stack);
+        throw new Error('Error retrieving organizations');
+      });
+  }
+
+  /**
+   * Retrieves organization data for a specific organization.
+   * @param {number} organizationId - The ID of the organization to retrieve data for.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @returns {Promise<object>} - A promise that resolves to the organization data.
+   * @throws {ForbiddenException} - If the user is not part of the organization.
+   */
+  async getOrganizationData(organizationId: number, requestUserId: number) {
+    await this.checkIfUserExistsOnOrganization(requestUserId, organizationId);
+
+    const promiseArray = [
+      this.findOneOrganization(organizationId),
+      this.findAllOrganizationUser(organizationId),
+    ];
+
+    return Promise.all(promiseArray).then(([organization, users]) => {
+      return {
+        ...organization,
+        organizationUsers: users,
+      };
+    });
   }
 }
