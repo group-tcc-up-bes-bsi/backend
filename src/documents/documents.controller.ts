@@ -70,10 +70,7 @@ export class DocumentsController {
    * @returns {Promise<{}>} - A promise that resolves to the updated document object.
    */
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateDocumentDto: UpdateDocumentDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateDocumentDto: UpdateDocumentDto) {
     return this.documentsService.update(+id, updateDocumentDto);
   }
 

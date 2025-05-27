@@ -4,10 +4,8 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
-import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
-import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
 
-describe('Users Controller (e2e)', () => {
+describe('E2E - Users Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
@@ -25,9 +23,10 @@ describe('Users Controller (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await db.getRepository(OrganizationUserEntity).delete({});
-    await db.getRepository(OrganizationEntity).delete({});
-    await db.getRepository(UserEntity).delete({});
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.getRepository(UserEntity).clear();
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
@@ -227,9 +226,7 @@ describe('Users Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe(
-            'You are not authorized to access this resource',
-          );
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
   });
@@ -309,9 +306,7 @@ describe('Users Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'nonexistent_user' })
         .expect((res) => {
-          expect(res.body.message).toBe(
-            'You are not authorized to access this resource',
-          );
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
 
@@ -396,9 +391,7 @@ describe('Users Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe(
-            'You are not authorized to access this resource',
-          );
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
   });

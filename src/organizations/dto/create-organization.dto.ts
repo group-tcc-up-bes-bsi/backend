@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsString } from 'class-validator';
 import { OrganizationType } from '../entities/organization.entity';
 /**
  * Data Transfer Object for creating a organization.
@@ -12,8 +12,4 @@ export class CreateOrganizationDto {
 
   @IsEnum(OrganizationType)
   organizationType: OrganizationType;
-
-  @IsOptional()
-  @IsNumber()
-  userCreatedId: number;
 }

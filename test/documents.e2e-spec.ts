@@ -5,10 +5,8 @@ import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { DocumentEntity } from 'src/documents/entities/document.entity';
-import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
-import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
 
-describe('Documents Controller (e2e)', () => {
+describe('E2E - Documents Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
@@ -30,9 +28,10 @@ describe('Documents Controller (e2e)', () => {
 
     db = app.get(DataSource);
 
-    await db.getRepository(OrganizationUserEntity).delete({});
-    await db.getRepository(OrganizationEntity).delete({});
-    await db.getRepository(UserEntity).delete({});
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.getRepository(UserEntity).clear();
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
@@ -48,7 +47,9 @@ describe('Documents Controller (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await db.getRepository(DocumentEntity).delete({});
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.getRepository(DocumentEntity).clear();
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
   });
 
   afterAll(async () => {
@@ -57,10 +58,7 @@ describe('Documents Controller (e2e)', () => {
 
   describe('Create', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .post('/documents')
-        .send(testDocument)
-        .expect(401);
+      return request(app.getHttpServer()).post('/documents').send(testDocument).expect(401);
     });
 
     it('Document created successfully', async () => {
@@ -76,9 +74,7 @@ describe('Documents Controller (e2e)', () => {
       });
 
       expect(
-        await db
-          .getRepository(DocumentEntity)
-          .findOneBy({ documentId: body.documentId }),
+        await db.getRepository(DocumentEntity).findOneBy({ documentId: body.documentId }),
       ).toMatchObject({
         ...testDocument,
         documentId: body.documentId,
@@ -181,10 +177,7 @@ describe('Documents Controller (e2e)', () => {
 
   describe('Update', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .patch('/documents/1')
-        .send(testDocument)
-        .expect(401);
+      return request(app.getHttpServer()).patch('/documents/1').send(testDocument).expect(401);
     });
 
     it('Document updated successfully', async () => {
@@ -207,13 +200,9 @@ describe('Documents Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(newDocument)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Document successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Document successfully updated'));
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId }),
-      ).toMatchObject({
+      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
         ...newDocument,
         documentId,
         documentCreationDate: expect.any(Date),
@@ -235,13 +224,9 @@ describe('Documents Controller (e2e)', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({ documentName: 'updated document' })
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Document successfully updated'),
-        );
+        .expect(({ text }) => expect(text).toBe('Document successfully updated'));
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId }),
-      ).toMatchObject({
+      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
         ...testDocument,
         documentName: 'updated document',
         documentId,
@@ -261,10 +246,7 @@ describe('Documents Controller (e2e)', () => {
 
   describe('Delete', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .delete('/documents/1')
-        .send(testDocument)
-        .expect(401);
+      return request(app.getHttpServer()).delete('/documents/1').send(testDocument).expect(401);
     });
 
     it('Document deleted successfully', async () => {
@@ -280,13 +262,9 @@ describe('Documents Controller (e2e)', () => {
         .delete(`/documents/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
-        .expect(({ text }) =>
-          expect(text).toBe('Document successfully removed'),
-        );
+        .expect(({ text }) => expect(text).toBe('Document successfully removed'));
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId }),
-      ).toBeNull();
+      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toBeNull();
     });
 
     it('Document not found', () => {

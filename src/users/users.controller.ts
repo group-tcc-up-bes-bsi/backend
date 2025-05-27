@@ -81,11 +81,7 @@ export class UsersController {
    */
   @UseGuards(AuthGuard)
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateUserDto,
-    @Request() request,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Request() request) {
     this.checkUserAccess(+id, request);
     return this.usersService.update(+id, dto);
   }
@@ -114,12 +110,8 @@ export class UsersController {
    */
   private checkUserAccess(id: number, @Request() request) {
     if (+request.user.userId !== id) {
-      this.logger.warn(
-        `User with ID ${request.user.userId} tried to access user with ID ${id}`,
-      );
-      throw new UnauthorizedException(
-        'You are not authorized to access this resource',
-      );
+      this.logger.warn(`User with ID ${request.user.userId} tried to access user with ID ${id}`);
+      throw new UnauthorizedException('You are not authorized to access this resource');
     }
   }
 }

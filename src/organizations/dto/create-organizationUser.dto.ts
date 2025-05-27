@@ -5,7 +5,7 @@ import { UserType } from '../entities/organization-user.entity';
  * Data Transfer Object for adding a user to the organization.
  * Only the organization owners can add users to the organization.
  */
-export class AddUserToOrganizationDto {
+export class CreateOrganizationUserDto {
   @IsNumber()
   organizationId: number;
 
