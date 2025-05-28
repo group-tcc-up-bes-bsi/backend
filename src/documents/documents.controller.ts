@@ -30,18 +30,15 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   /**
-   * Creates a new document. If no userId is provided, it uses the userId from the request object.
-   * @param {CreateDocumentDto} createDocumentDto - The data transfer object containing document details.
+   * Creates a new document.
+   * @param {CreateDocumentDto} dto - The data transfer object containing document details.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the created document object.
    */
   @HttpCode(HttpStatus.CREATED)
   @Post()
-  create(@Body() createDocumentDto: CreateDocumentDto, @Request() request) {
-    if (!createDocumentDto.userId) {
-      createDocumentDto.userId = request.user.userId;
-    }
-    return this.documentsService.create(createDocumentDto);
+  create(@Body() dto: CreateDocumentDto, @Request() request) {
+    return this.documentsService.createDocument(dto, request.user.userId);
   }
 
   /**

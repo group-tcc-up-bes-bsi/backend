@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsString } from 'class-validator';
 
 /**
  * Data Transfer Object for creating a document.
@@ -13,7 +13,6 @@ export class CreateDocumentDto {
   @IsString()
   documentDescription: string;
 
-  @IsOptional()
   @IsNumber()
-  userId: number;
+  organizationId: number;
 }

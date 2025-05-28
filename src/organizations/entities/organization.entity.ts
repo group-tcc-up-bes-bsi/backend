@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
+import { DocumentEntity } from 'src/documents/entities/document.entity';
 
 /**
  * Supported organization types
@@ -30,4 +31,7 @@ export class OrganizationEntity {
 
   @OneToMany(() => OrganizationUserEntity, (orgUser) => orgUser.organization)
   organizationUsers: OrganizationUserEntity[];
+
+  @OneToMany(() => DocumentEntity, (document) => document.organization)
+  documents: DocumentEntity[];
 }

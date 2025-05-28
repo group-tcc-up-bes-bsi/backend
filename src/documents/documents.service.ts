@@ -4,7 +4,7 @@ import { UpdateDocumentDto } from './dto/update-document.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DocumentEntity } from './entities/document.entity';
 import { Repository } from 'typeorm';
-import { UsersService } from 'src/users/users.service';
+import { OrganizationsService } from 'src/organizations/organizations.service';
 
 /**
  * Service for managing documents.
@@ -16,35 +16,34 @@ export class DocumentsService {
   /**
    * Creates an instance of DocumentsService.
    * @param {Repository<DocumentEntity>} documentsRepo - The repository for document entities.
-   * @param {UsersService} usersService - The service for managing users.
+   * @param {OrganizationsService} organizationsService - The service for managing users.
    */
   constructor(
     @InjectRepository(DocumentEntity)
     private readonly documentsRepo: Repository<DocumentEntity>,
-    private usersService: UsersService,
+    private organizationsService: OrganizationsService,
   ) {}
 
   /**
    * Creates a new document.
-   * @param {CreateDocumentDto} createDocumentDto - The data transfer object containing document details.
+   * Only organization owners can create documents.
+   * @param {CreateDocumentDto} dto - The data transfer object.
+   * @param {number} requestUserId - The ID of the user making the request.
    * @returns {object} - Object containing message and documentId.
    * @throws {NotFoundException} - If the user is not found.
    * @throws {Error} - If an error occurs during the save process.
    */
-  async create(createDocumentDto: CreateDocumentDto) {
-    const { userId, ...rest } = createDocumentDto;
-
-    const user = await this.usersService.findOne(userId);
-
-    if (!user) {
-      this.logger.error(`User with ID ${userId} was not found.`);
-      return new NotFoundException('User was not found');
-    }
+  createDocument(dto: CreateDocumentDto, requestUserId: number) {
+    this.organizationsService.checkIfUserIsOwner(
+      requestUserId,
+      dto.organizationId,
+      'createDocument',
+    );
 
     return this.documentsRepo
-      .save(this.documentsRepo.create({ ...rest, owner: user }))
+      .save(this.documentsRepo.create(dto))
       .then(({ documentId }) => {
-        this.logger.log(`Document Id ${documentId} saved successfully`);
+        this.logger.debug(`Document Id ${documentId} saved successfully`);
         return {
           message: 'Document successfully created',
           documentId,
@@ -61,12 +60,7 @@ export class DocumentsService {
    * @returns {Promise<[]>} - A promise that resolves to an array of document objects.
    */
   findAll() {
-    return this.documentsRepo.find().then((documents) => {
-      return documents.map((document) => ({
-        ...document,
-        owner: document.owner?.userId,
-      }));
-    });
+    return this.documentsRepo.find();
   }
 
   /**
@@ -83,10 +77,7 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
-    return {
-      ...document,
-      owner: document.owner?.userId,
-    };
+    return document;
   }
 
   /**

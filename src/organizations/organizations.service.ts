@@ -4,7 +4,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrganizationEntity, OrganizationType } from './entities/organization.entity';
@@ -62,22 +61,26 @@ export class OrganizationsService {
       });
   }
 
+  ///////////////////////////////////////////////////////////////////////
+  // Public general functions
+  ///////////////////////////////////////////////////////////////////////
+
   /**
    * Checks if the user is the owner of the organization.
    * @param {number} userId - The ID of the user to check.
    * @param {number} organizationId - The ID of the organization to check.
    * @param {string} context - Function name that is calling this function.
-   * @throws {UnauthorizedException} - If the user is not the owner of the organization.
+   * @throws {ForbiddenException} - If the user is not the owner of the organization.
    * @returns {Promise<void>} - A promise that resolves if the user is the owner.
    */
-  private async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
+  async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
     const user = await this.checkIfUserExistsOnOrganization(userId, organizationId);
 
     if (user?.userType !== UserType.OWNER) {
       this.logger.warn(
         `[SECURITY] User ${userId} is trying to update organization ${organizationId} via ${context}`,
       );
-      throw new UnauthorizedException('You do not have permission to do this');
+      throw new ForbiddenException('You do not have permission to do this');
     }
   }
 
@@ -146,7 +149,7 @@ export class OrganizationsService {
    * @param {number} requestUserId - The ID of the user making the request.
    * @param {UpdateOrganizationDto} dto  - The data transfer object containing updated organization information.
    * @returns {string} - A success message.
-   * @throws {UnauthorizedException} - If the user is not authorized to update the organization.
+   * @throws {ForbiddenException} - If the user is not authorized to update the organization.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the organization with the specified ID does not exist.
    * @throws {Error} - If an error occurs during the update process.
@@ -200,7 +203,7 @@ export class OrganizationsService {
    * Only the organization owner can access this handler.
    * @param {number} organizationId - The ID of the organization to delete.
    * @param {number} requestUserId - The ID of the user making the request.
-   * @throws {UnauthorizedException} - If the user is not authorized to delete the organization.
+   * @throws {ForbiddenException} - If the user is not authorized to delete the organization.
    * @throws {NotFoundException} - If the organization with the specified ID does not exist.
    * @throws {Error} - If an error occurs during the deletion process.
    * @returns {string} - A success message.
@@ -394,7 +397,7 @@ export class OrganizationsService {
    * @param {CreateOrganizationUserDto} dto - The data transfer object containing organization user information.
    * @param {number} requestUserId - The ID of the user making the request.
    * @returns {Promise<string>} - A promise that resolves to a success message.
-   * @throws {UnauthorizedException} - If the user is not authorized to add a new user.
+   * @throws {ForbiddenException} - If the user is not authorized to add a new user.
    */
   async addUserToOrganization(dto: CreateOrganizationUserDto, requestUserId: number) {
     await this.checkIfUserIsOwner(requestUserId, dto.organizationId, 'addUserToOrganization');
@@ -408,7 +411,7 @@ export class OrganizationsService {
    * @param {number} requestUserId - The ID of the user making the request.
    * @returns {Promise<string>} - A promise that resolves to a success message.
    * @throws {BadRequestException} - If no new userType is provided.
-   * @throws {UnauthorizedException} - If the user is not authorized to update permissions.
+   * @throws {ForbiddenException} - If the user is not authorized to update permissions.
    */
   async updateUserPermission(dto: UpdateOrganizationUserDto, requestUserId: number) {
     await this.checkIfUserIsOwner(requestUserId, dto.organizationId, 'updateUserPermission');
@@ -417,7 +420,7 @@ export class OrganizationsService {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying to update inviteAccepted on updateUserPermission`,
       );
-      throw new UnauthorizedException('You do not have permission to change inviteAccepted');
+      throw new ForbiddenException('You do not have permission to change inviteAccepted');
     }
 
     if (!dto.userType) {
@@ -434,21 +437,21 @@ export class OrganizationsService {
    * @param {number} requestUserId - The ID of the user making the request.
    * @returns {Promise<string>} - A promise that resolves to a success message.
    * @throws {BadRequestException} - If no new invite status is provided.
-   * @throws {UnauthorizedException} - If the user is not authorized to update.
+   * @throws {ForbiddenException} - If the user is not authorized to update.
    */
   async updateUserInviteStatus(dto: UpdateOrganizationUserDto, requestUserId: number) {
     if (requestUserId !== dto.userId) {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying to change invite status from user ${dto.userId}.`,
       );
-      throw new UnauthorizedException('You do not have permission to do this');
+      throw new ForbiddenException('You do not have permission to do this');
     }
 
     if (dto.userType) {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying to update userType on updateUserInviteStatus`,
       );
-      throw new UnauthorizedException('You do not have permission to change userType');
+      throw new ForbiddenException('You do not have permission to change userType');
     }
 
     if (!dto.inviteAccepted) {
@@ -480,7 +483,7 @@ export class OrganizationsService {
       this.logger.warn(
         `[SECURITY] User ${requestUserId} is trying to remove user ${userId} from organization ${orgId}`,
       );
-      throw new UnauthorizedException('You do not have permission to do this');
+      throw new ForbiddenException('You do not have permission to do this');
     }
 
     return this.removeOrganizationUser(orgId, userId);

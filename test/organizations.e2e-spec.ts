@@ -483,7 +483,7 @@ describe('E2E - Organizations Endpoints', () => {
         .post(`/organizations/addUser`)
         .set('Authorization', `Bearer ${authToken2}`)
         .send(newOrgUser)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -791,7 +791,7 @@ describe('E2E - Organizations Endpoints', () => {
           userType: UserType.OWNER,
           inviteAccepted: true,
         })
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toContain('You do not have permission to change inviteAccepted');
         });
@@ -845,7 +845,7 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUser,
           userType: UserType.WRITE,
         })
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
   });
@@ -952,7 +952,7 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUserInvite,
           userId: 99999,
         })
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -992,7 +992,7 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUserInvite,
           userType: UserType.OWNER,
         })
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toContain('You do not have permission to change userType');
         });
@@ -1017,7 +1017,7 @@ describe('E2E - Organizations Endpoints', () => {
         .patch(`/organizations/updateUser/invite`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(newOrgUserInvite)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
   });
@@ -1118,7 +1118,7 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .delete(`/organizations/removeUser/${testOrganizationId}/${userId2}`)
         .set('Authorization', `Bearer ${authToken3}`)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -1127,7 +1127,7 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .delete(`/organizations/removeUser/${testOrganizationId}/${userId2}`)
         .set('Authorization', `Bearer ${authToken3}`)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -1143,7 +1143,7 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .delete(`/organizations/removeUser/99999/${userId2}`)
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 

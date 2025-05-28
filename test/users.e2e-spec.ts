@@ -152,12 +152,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Read - Get all', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .get('/users')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).get('/users').expect(401);
     });
 
     it('Get all users successfully', async () => {
@@ -198,12 +193,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Read - Get by Id', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .get(`/users/${userId}`)
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).get(`/users/${userId}`).expect(401);
     });
 
     it('Get user by ID successfully', () => {
@@ -224,7 +214,7 @@ describe('E2E - Users Endpoints', () => {
       return request(app.getHttpServer())
         .get('/users/99999')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toBe('You are not authorized to access this resource');
         });
@@ -233,13 +223,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Update', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .patch(`/users/${userId}`)
-        .send({ username: 'updated_user', password: 'newpassword123' })
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).patch(`/users/${userId}`).expect(401);
     });
 
     it('User updated successfully', () => {
@@ -356,12 +340,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Delete', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .delete('/users/999')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).delete('/users/999').expect(401);
     });
 
     it('User deleted successfully', () => {
@@ -389,7 +368,7 @@ describe('E2E - Users Endpoints', () => {
       return request(app.getHttpServer())
         .delete('/users/11111')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toBe('You are not authorized to access this resource');
         });

@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
+import { DocumentVersionEntity } from './document-version.entity';
 
 /**
  * Represents a document entity in the database.
@@ -21,10 +22,21 @@ export class DocumentEntity {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   documentCreationDate: Date;
 
+  // Should be updated when a new version is added
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   documentLastModifiedDate: Date;
 
-  @ManyToOne(() => UserEntity, (user) => user.documents, { eager: true }) // eager: user entity will be loaded with the document
-  @JoinColumn({ name: 'userId' }) // Foreign key column in the documents table
-  owner: UserEntity;
+  // Id of the active version of the document
+  @Column({ nullable: true })
+  documentActiveVersionId: number;
+
+  @Column() // Foreign Key
+  organizationId: number;
+
+  @ManyToOne(() => OrganizationEntity, (organization) => organization.documents)
+  @JoinColumn({ name: 'organizationId' })
+  organization: OrganizationEntity;
+
+  @OneToMany(() => DocumentVersionEntity, (version) => version.document)
+  versions: DocumentVersionEntity[];
 }

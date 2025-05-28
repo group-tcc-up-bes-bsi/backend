@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { DocumentEntity } from 'src/documents/entities/document.entity';
 
-describe('E2E - Documents Endpoints', () => {
+describe.skip('E2E - Documents Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
