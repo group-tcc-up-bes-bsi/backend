@@ -18,6 +18,9 @@ export class DocumentVersionEntity {
   @Column()
   versionFilePath: string;
 
+  @Column()
+  createdBy: number; // user id
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 

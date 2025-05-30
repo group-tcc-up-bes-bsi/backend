@@ -61,10 +61,6 @@ export class OrganizationsService {
       });
   }
 
-  ///////////////////////////////////////////////////////////////////////
-  // Public general functions
-  ///////////////////////////////////////////////////////////////////////
-
   /**
    * Checks if the user is the owner of the organization.
    * @param {number} userId - The ID of the user to check.
@@ -73,7 +69,7 @@ export class OrganizationsService {
    * @throws {ForbiddenException} - If the user is not the owner of the organization.
    * @returns {Promise<void>} - A promise that resolves if the user is the owner.
    */
-  async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
+  private async checkIfUserIsOwner(userId: number, organizationId: number, context: string) {
     const user = await this.checkIfUserExistsOnOrganization(userId, organizationId);
 
     if (user?.userType !== UserType.OWNER) {
@@ -82,6 +78,25 @@ export class OrganizationsService {
       );
       throw new ForbiddenException('You do not have permission to do this');
     }
+  }
+
+  ///////////////////////////////////////////////////////////////////////
+  // Public general functions
+  ///////////////////////////////////////////////////////////////////////
+
+  /**
+   * Checks if the user has the expected role in the organization.
+   * @param {number} userId - The ID of the user to check.
+   * @param {number} orgId - The ID of the organization to check.
+   * @param {UserType} expectedRole - Expected organization role name.
+   * @returns {Promise<boolean>} - A promise that resolves true if the user has the expected role.
+   */
+  async checkUserRole(userId: number, orgId: number, expectedRole: UserType): Promise<boolean> {
+    const user = await this.checkIfUserExistsOnOrganization(userId, orgId);
+    if (user?.userType === UserType[expectedRole]) {
+      return true;
+    }
+    return false;
   }
 
   ///////////////////////////////////////////////////////////////////////

@@ -30,54 +30,59 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   /**
-   * Creates a new document.
-   * @param {CreateDocumentDto} dto - The data transfer object containing document details.
-   * @param {Request} request - The request object containing user information.
-   * @returns {Promise<{}>} - A promise that resolves to the created document object.
-   */
-  @HttpCode(HttpStatus.CREATED)
-  @Post()
-  create(@Body() dto: CreateDocumentDto, @Request() request) {
-    return this.documentsService.createDocument(dto, request.user.userId);
-  }
-
-  /**
-   * Retrieves all documents.
-   * @returns {Promise<[]>} - A promise that resolves to an array of documents.
-   */
-  @Get()
-  findAll() {
-    return this.documentsService.findAll();
-  }
-
-  /**
    * Retrieves a document by its ID.
+   * @param {Request} request - The request object containing user information.
    * @param {string} id - The ID of the document to retrieve.
    * @returns {Promise<{}>} - A promise that resolves to the document object.
    */
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.documentsService.findOne(+id);
+  findOne(@Request() request, @Param('id') id: string) {
+    return this.documentsService.findOne(+request.user.userId, +id);
+  }
+
+  /**
+   * Retrieves all documents by organization ID..
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the document to retrieve.
+   * @returns {Promise<[]>} - A promise that resolves to an array of documents.
+   */
+  @Get('organization/:id')
+  findAllByOrganization(@Request() request, @Param('id') id: string) {
+    return this.documentsService.findAllByOrganization(+request.user.userId, +id);
+  }
+
+  /**
+   * Creates a new document.
+   * @param {Request} request - The request object containing user information.
+   * @param {CreateDocumentDto} dto - The data transfer object containing document details.
+   * @returns {Promise<{}>} - A promise that resolves to the created document object.
+   */
+  @HttpCode(HttpStatus.CREATED)
+  @Post()
+  create(@Request() request, @Body() dto: CreateDocumentDto) {
+    return this.documentsService.createDocument(+request.user.userId, dto);
   }
 
   /**
    * Updates a document by its ID.
+   * @param {Request} request - The request object containing user information.
    * @param {string} id - The ID of the document to update.
-   * @param {UpdateDocumentDto} updateDocumentDto - The data transfer object containing updated document details.
-   * @returns {Promise<{}>} - A promise that resolves to the updated document object.
+   * @param {UpdateDocumentDto} dto - The data transfer object containing updated document details.
+   * @returns {Promise<string>} - A promise that resolves to a success message.
    */
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDocumentDto: UpdateDocumentDto) {
-    return this.documentsService.update(+id, updateDocumentDto);
+  update(@Request() request, @Param('id') id: string, @Body() dto: UpdateDocumentDto) {
+    return this.documentsService.update(+request.user.userId, +id, dto);
   }
 
   /**
    * Deletes a document by its ID.
+   * @param {Request} request - The request object containing user information.
    * @param {string} id - The ID of the document to delete.
-   * @returns {Promise<{}>} - A promise that resolves to the result of the deletion operation.
+   * @returns {Promise<string>} - A promise that resolves to a success message.
    */
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.documentsService.remove(+id);
+  remove(@Request() request, @Param('id') id: string) {
+    return this.documentsService.remove(+request.user.userId, +id);
   }
 }
