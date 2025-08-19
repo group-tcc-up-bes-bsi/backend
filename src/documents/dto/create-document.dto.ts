@@ -5,13 +5,13 @@ import { IsNumber, IsString } from 'class-validator';
  */
 export class CreateDocumentDto {
   @IsString()
-  documentName: string;
+  name: string;
 
   @IsString()
-  documentType: string;
+  type: string;
 
   @IsString()
-  documentDescription: string;
+  description: string;
 
   @IsNumber()
   organizationId: number;

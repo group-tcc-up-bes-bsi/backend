@@ -6,13 +6,13 @@ import { IsOptional, IsString } from 'class-validator';
 export class UpdateDocumentDto {
   @IsOptional()
   @IsString()
-  documentName: string;
+  name: string;
 
   @IsOptional()
   @IsString()
-  documentType: string;
+  type: string;
 
   @IsOptional()
   @IsString()
-  documentDescription: string;
+  description: string;
 }

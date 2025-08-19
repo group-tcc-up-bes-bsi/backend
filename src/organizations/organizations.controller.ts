@@ -15,7 +15,7 @@ import { OrganizationsService } from './organizations.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
-import { CreateOrganizationUserDto } from './dto/create-organizationUser.dto';
+import { CreateOrganizationUserDto } from './dto/create-organization-user.dto';
 import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto';
 
 /**

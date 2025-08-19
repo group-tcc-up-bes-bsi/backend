@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
+import { User } from 'src/users/entities/user.entity';
 
 describe('E2E - Users Endpoints', () => {
   let app: INestApplication;
@@ -24,10 +24,10 @@ describe('E2E - Users Endpoints', () => {
 
   beforeEach(async () => {
     await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(UserEntity).clear();
+    await db.getRepository(User).clear();
     await db.query('SET FOREIGN_KEY_CHECKS = 1');
 
-    const user = await db.getRepository(UserEntity).save({
+    const user = await db.getRepository(User).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',
@@ -35,9 +35,7 @@ describe('E2E - Users Endpoints', () => {
     userId = user.userId;
 
     authToken = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+      await request(app.getHttpServer()).post('/auth/login').send({ email: 'test@example.com', password: '123' })
     ).body.token;
   });
 
@@ -64,7 +62,7 @@ describe('E2E - Users Endpoints', () => {
           expect(res.body.userId).toBeDefined();
         })
         .expect((res) => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: res.body.userId })
             .then((user) => {
               expect(user).toBeDefined();
@@ -156,13 +154,13 @@ describe('E2E - Users Endpoints', () => {
     });
 
     it('Get all users successfully', async () => {
-      await db.getRepository(UserEntity).save({
+      await db.getRepository(User).save({
         username: 'user1',
         password: 'password1',
         email: 'user1@example.com',
       });
 
-      await db.getRepository(UserEntity).save({
+      await db.getRepository(User).save({
         username: 'user2',
         password: 'password2',
         email: 'user2@example.com',
@@ -246,7 +244,7 @@ describe('E2E - Users Endpoints', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
@@ -271,7 +269,7 @@ describe('E2E - Users Endpoints', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
@@ -356,7 +354,7 @@ describe('E2E - Users Endpoints', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toBeNull();

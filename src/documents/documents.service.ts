@@ -1,14 +1,8 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DocumentEntity } from './entities/document.entity';
+import { Document } from './entities/document.entity';
 import { Repository } from 'typeorm';
 import { OrganizationsService } from 'src/organizations/organizations.service';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
@@ -22,12 +16,12 @@ export class DocumentsService {
 
   /**
    * Creates an instance of DocumentsService.
-   * @param {Repository<DocumentEntity>} documentsRepo - The repository for document entities.
+   * @param {Repository<Document>} documentsRepo - The repository for document entities.
    * @param {OrganizationsService} organizationsService - The service for managing users.
    */
   constructor(
-    @InjectRepository(DocumentEntity)
-    private readonly documentsRepo: Repository<DocumentEntity>,
+    @InjectRepository(Document)
+    private readonly documentsRepo: Repository<Document>,
     private organizationsService: OrganizationsService,
   ) {}
 
@@ -41,14 +35,9 @@ export class DocumentsService {
    * @param {number} organizationId - Organization ID.
    * @throws {ForbiddenException} - If the user is not Reader, Writer or Owner.
    */
-  private async checkViewPermission(userId: number, organizationId: number): Promise<void> {
-    const [isOwner, isWriter, isReader] = await Promise.all([
-      this.organizationsService.checkUserRole(userId, organizationId, UserType.OWNER),
-      this.organizationsService.checkUserRole(userId, organizationId, UserType.WRITE),
-      this.organizationsService.checkUserRole(userId, organizationId, UserType.READ),
-    ]);
-
-    if (!isOwner && !isWriter && !isReader) {
+  private async checkReadPermission(userId: number, organizationId: number): Promise<void> {
+    const roleArray = [UserType.OWNER, UserType.WRITE, UserType.READ];
+    if (!this.organizationsService.checkUserRole(userId, organizationId, roleArray)) {
       throw new ForbiddenException();
     }
   }
@@ -60,13 +49,8 @@ export class DocumentsService {
    * @throws {ForbiddenException} - If the user is not Writer or Owner.
    */
   private async checkEditPermission(userId: number, organizationId: number): Promise<void> {
-    // Using promise.all array to improve code performance, runs in parallel.
-    const [isOwner, isWriter] = await Promise.all([
-      this.organizationsService.checkUserRole(userId, organizationId, UserType.OWNER),
-      this.organizationsService.checkUserRole(userId, organizationId, UserType.WRITE),
-    ]);
-
-    if (!isOwner && !isWriter) {
+    const roleArray = [UserType.OWNER, UserType.WRITE];
+    if (!this.organizationsService.checkUserRole(userId, organizationId, roleArray)) {
       throw new ForbiddenException();
     }
   }
@@ -77,8 +61,8 @@ export class DocumentsService {
    * @param {number} organizationId - Organization ID.
    * @throws {ForbiddenException} - If the user is not Writer or Owner.
    */
-  private async checkDeletePermission(userId: number, organizationId: number): Promise<void> {
-    if (!this.organizationsService.checkUserRole(userId, organizationId, UserType.OWNER)) {
+  private async checkOwnerPermission(userId: number, organizationId: number): Promise<void> {
+    if (!this.organizationsService.checkUserRole(userId, organizationId, [UserType.OWNER])) {
       throw new ForbiddenException();
     }
   }
@@ -183,7 +167,7 @@ export class DocumentsService {
    * @throws {Error} - If an error occurs during the removal process.
    */
   async remove(requestUserId: number, documentId: number) {
-    await this.checkDeletePermission(requestUserId, await this.getOrganizationId(documentId));
+    await this.checkOwnerPermission(requestUserId, await this.getOrganizationId(documentId));
     const document = await this.documentsRepo.findOneBy({ documentId });
     if (document) {
       return this.documentsRepo
@@ -210,7 +194,7 @@ export class DocumentsService {
    * @returns {Promise<[]>} - A promise that resolves to an array of document objects.
    */
   async findAllByOrganization(requestUserId: number, organizationId: number) {
-    await this.checkViewPermission(requestUserId, organizationId);
+    await this.checkReadPermission(requestUserId, organizationId);
     const documents = await this.documentsRepo.findBy({ organizationId });
 
     if (!documents || documents.length === 0) {
@@ -227,7 +211,7 @@ export class DocumentsService {
    * @throws {NotFoundException} - If the document is not found.
    */
   async findOne(requestUserId: number, documentId: number) {
-    await this.checkViewPermission(requestUserId, await this.getOrganizationId(documentId));
+    await this.checkReadPermission(requestUserId, await this.getOrganizationId(documentId));
     const document = await this.documentsRepo.findOneBy({ documentId });
 
     if (!document) {

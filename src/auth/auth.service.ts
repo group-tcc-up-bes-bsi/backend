@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { User, UsersService } from 'src/users/users.service';
+import { UsersService } from 'src/users/users.service';
 
 type AuthInput = { email: string; password: string };
 type AuthOutput = { token: string; user: { userId: number; email: string } };
@@ -56,7 +56,7 @@ export class AuthService {
   // Private methods
   ///////////////////////////////////////////////////////////////////////
 
-  private async signIn(user: User): Promise<AuthOutput> {
+  private async signIn(user): Promise<AuthOutput> {
     const tokenPayload = {
       sub: user.userId,
       email: user.email,

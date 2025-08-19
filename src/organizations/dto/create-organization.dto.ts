@@ -5,10 +5,10 @@ import { OrganizationType } from '../entities/organization.entity';
  */
 export class CreateOrganizationDto {
   @IsString()
-  organizationName: string;
+  name: string;
 
   @IsString()
-  organizationDescription: string;
+  description: string;
 
   @IsEnum(OrganizationType)
   organizationType: OrganizationType;

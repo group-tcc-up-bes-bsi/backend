@@ -1,12 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
-import { OrganizationEntity } from 'src/organizations/entities/organization.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, RelationId } from 'typeorm';
+import { User } from 'src/users/entities/user.entity';
+import { Organization } from 'src/organizations/entities/organization.entity';
 
 /**
- * Supported User types / Tipos de usuários suportados
- * OWNER - System administrator with full permissions / Administrador do sistema com permissões totais
- * READ - Editor with read and write access / Editor com acesso de leitura e escrita
- * VIEWER - Read-only access / Acesso somente leitura
+ * Supported User types:
+ * - OWNER - Organization administrator.
+ * - WRITE - Creation and update access.
+ * - READ - Read-only access.
  */
 export enum UserType {
   OWNER = 'owner',
@@ -15,32 +15,34 @@ export enum UserType {
 }
 
 /**
- * Entity representing the structure of the organizations-users table in the database.
+ * OrganizationUser entity.
  */
 @Entity('organization_users')
-export class OrganizationUserEntity {
+export class OrganizationUser {
   @PrimaryGeneratedColumn()
   organizationUserId: number;
 
-  @Column() // Foreign Key
-  userId: number;
-
-  @ManyToOne(() => UserEntity, (user) => user.organizations)
-  @JoinColumn({ name: 'userId' })
-  user: UserEntity;
-
-  @Column() // Foreign Key
-  organizationId: number;
-
-  @ManyToOne(() => OrganizationEntity, (org) => org.organizationUsers, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'organizationId' })
-  organization: OrganizationEntity;
+  @Column()
+  inviteAccepted: boolean;
 
   @Column({ type: 'enum', enum: UserType })
   userType: UserType;
 
-  @Column()
-  inviteAccepted: boolean;
+  /* ------------- The user ------------- */
+  @ManyToOne(() => User, (user) => user.organizations)
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+  @RelationId((orgUser: OrganizationUser) => orgUser.user)
+  userId: number;
+
+  /* ------------- The organization that the user is part of ------------- */
+  @ManyToOne(() => Organization, (org) => org.organizationUsers, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'organizationId' })
+  organization: Organization;
+
+  @RelationId((orgUser: OrganizationUser) => orgUser.organization)
+  organizationId: number;
 }

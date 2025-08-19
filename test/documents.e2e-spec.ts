@@ -3,8 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
-import { DocumentEntity } from 'src/documents/entities/document.entity';
+import { User } from 'src/users/entities/user.entity';
+import { Document } from 'src/documents/entities/document.entity';
 
 describe.skip('E2E - Documents Endpoints', () => {
   let app: INestApplication;
@@ -29,10 +29,10 @@ describe.skip('E2E - Documents Endpoints', () => {
     db = app.get(DataSource);
 
     await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(UserEntity).clear();
+    await db.getRepository(User).clear();
     await db.query('SET FOREIGN_KEY_CHECKS = 1');
 
-    const user = await db.getRepository(UserEntity).save({
+    const user = await db.getRepository(User).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',
@@ -40,15 +40,13 @@ describe.skip('E2E - Documents Endpoints', () => {
     userId = user.userId;
 
     authToken = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+      await request(app.getHttpServer()).post('/auth/login').send({ email: 'test@example.com', password: '123' })
     ).body.token;
   });
 
   beforeEach(async () => {
     await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(DocumentEntity).clear();
+    await db.getRepository(Document).clear();
     await db.query('SET FOREIGN_KEY_CHECKS = 1');
   });
 
@@ -73,9 +71,7 @@ describe.skip('E2E - Documents Endpoints', () => {
         documentId: expect.any(Number),
       });
 
-      expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId: body.documentId }),
-      ).toMatchObject({
+      expect(await db.getRepository(Document).findOneBy({ documentId: body.documentId })).toMatchObject({
         ...testDocument,
         documentId: body.documentId,
         documentCreationDate: expect.any(Date),
@@ -144,10 +140,7 @@ describe.skip('E2E - Documents Endpoints', () => {
     });
 
     it('Document not found', () => {
-      return request(app.getHttpServer())
-        .get('/documents/999')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(404);
+      return request(app.getHttpServer()).get('/documents/999').set('Authorization', `Bearer ${authToken}`).expect(404);
     });
 
     it('Get document by ID', async () => {
@@ -202,7 +195,7 @@ describe.skip('E2E - Documents Endpoints', () => {
         .expect(200)
         .expect(({ text }) => expect(text).toBe('Document successfully updated'));
 
-      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
         ...newDocument,
         documentId,
         documentCreationDate: expect.any(Date),
@@ -226,7 +219,7 @@ describe.skip('E2E - Documents Endpoints', () => {
         .expect(200)
         .expect(({ text }) => expect(text).toBe('Document successfully updated'));
 
-      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
         ...testDocument,
         documentName: 'updated document',
         documentId,
@@ -264,7 +257,7 @@ describe.skip('E2E - Documents Endpoints', () => {
         .expect(200)
         .expect(({ text }) => expect(text).toBe('Document successfully removed'));
 
-      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toBeNull();
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
     });
 
     it('Document not found', () => {

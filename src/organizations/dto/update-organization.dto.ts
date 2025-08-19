@@ -6,11 +6,11 @@ import { OrganizationType } from '../entities/organization.entity';
 export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
-  organizationName: string;
+  name: string;
 
   @IsOptional()
   @IsString()
-  organizationDescription: string;
+  description: string;
 
   @IsOptional()
   @IsEnum(OrganizationType)
