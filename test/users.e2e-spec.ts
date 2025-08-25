@@ -245,11 +245,12 @@ describe('E2E - Users Endpoints', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
+        .send({ username: 'new_john_doe' })
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
             userId: userId,
-            username: 'john_doe',
+            username: 'new_john_doe',
           });
         })
         .expect(() => {
@@ -258,7 +259,7 @@ describe('E2E - Users Endpoints', () => {
             .then((user) => {
               expect(user).toMatchObject({
                 userId: userId,
-                username: 'john_doe',
+                username: 'new_john_doe',
                 password: '123',
               });
             });
