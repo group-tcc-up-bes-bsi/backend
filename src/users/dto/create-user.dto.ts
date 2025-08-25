@@ -1,4 +1,4 @@
-import { IsEmail, IsString } from 'class-validator';
+import { IsString } from 'class-validator';
 
 /**
  * Data Transfer Object for creating a user.
@@ -9,7 +9,4 @@ export class CreateUserDto {
 
   @IsString()
   password: string;
-
-  @IsEmail()
-  email: string;
 }

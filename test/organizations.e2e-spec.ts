@@ -48,40 +48,37 @@ describe('E2E - Organizations Endpoints', () => {
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
-      email: 'test@example.com',
     });
     userId = user.userId;
 
     authToken = (
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+        .send({ username: 'john_doe', password: '123' })
     ).body.token;
 
     const user2 = await db.getRepository(UserEntity).save({
       username: 'new_john',
       password: '1234',
-      email: 'newTest@example.com',
     });
     userId2 = user2.userId;
 
     authToken2 = (
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'newTest@example.com', password: '1234' })
+        .send({ username: 'new_john', password: '1234' })
     ).body.token;
 
     const user3 = await db.getRepository(UserEntity).save({
       username: 'jane_doe',
       password: '123',
-      email: 'jane@example.com',
     });
     userId3 = user3.userId;
 
     authToken3 = (
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'jane@example.com', password: '123' })
+        .send({ username: 'jane_doe', password: '123' })
     ).body.token;
   });
 

@@ -25,13 +25,13 @@ export class AuthController {
   /**
    * Handles user login requests.
    * @param {object} input - The login credentials.
-   * @param {string} input.email - The user's email address.
+   * @param {string} input.username - The user's username address.
    * @param {string} input.password - The user's password.
    * @returns {Promise<object>} The authentication token.
    */
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() input: { email: string; password: string }) {
+  login(@Body() input: { username: string; password: string }) {
     return this.authService.login(input);
   }
 

@@ -24,7 +24,6 @@ describe('E2E - Auth Endpoints', () => {
     await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
-      email: 'test@example.com',
     });
   });
 
@@ -36,29 +35,29 @@ describe('E2E - Auth Endpoints', () => {
     it('Logged in successfully', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+        .send({ username: 'john_doe', password: '123' })
         .expect(200)
         .expect((res) => {
           expect(res.body.token).toBeDefined();
           expect(res.body.user.userId).toBeDefined();
-          expect(res.body.user.email).toBeDefined();
+          expect(res.body.user.username).toBeDefined();
         });
     });
 
-    it('Invalid email', () => {
+    it('Invalid username', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'random', password: 'invalid' })
+        .send({ username: 'random', password: 'invalid' })
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('Invalid email');
+          expect(res.body.message).toBe('Invalid username');
         });
     });
 
     it('Invalid password', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'test@example.com', password: 'invalid' })
+        .send({ username: 'john_doe', password: 'invalid' })
         .expect(401)
         .expect((res) => {
           expect(res.body.message).toBe('Invalid password');
@@ -68,10 +67,10 @@ describe('E2E - Auth Endpoints', () => {
     it('Missing properties', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'test@example.com' })
+        .send({ username: 'john_doe' })
         .expect(400)
         .expect((res) => {
-          expect(res.body.message).toBe('email and password are required');
+          expect(res.body.message).toBe('username and password are required');
         });
     });
   });
@@ -80,7 +79,7 @@ describe('E2E - Auth Endpoints', () => {
     it('Get user info, user is authenticated', async () => {
       const loginResponse = await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+        .send({ username: 'john_doe', password: '123' })
         .expect(200);
       const token = loginResponse.body.token;
       return request(app.getHttpServer())
@@ -89,7 +88,7 @@ describe('E2E - Auth Endpoints', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body.userId).toBeDefined();
-          expect(res.body.email).toBe('test@example.com');
+          expect(res.body.username).toBe('john_doe');
         });
     });
 

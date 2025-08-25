@@ -12,7 +12,6 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 export type User = {
-  email: string;
   userId: number;
   username: string;
   password: string;
@@ -48,18 +47,6 @@ export class UsersService {
   }
 
   /**
-   * Finds a user by their email.
-   * @param {string} email - The email of the user to find.
-   * @returns {Promise<User | undefined>} - A promise that resolves to the user object if found, or undefined if not found.
-   */
-  async findByEmail(email: string): Promise<User | undefined> {
-    const user = await this.usersRepo.findOne({
-      where: { email },
-    });
-    return user;
-  }
-
-  /**
    * Retrieves all users.
    * @returns {Promise<UserEntity[]>} - A promise that resolves to an array of user entities.
    */
@@ -85,7 +72,7 @@ export class UsersService {
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
    * @returns {Promise<UserEntity>} - A promise that resolves to the created user entity.
-   * @throws {ConflictException} - If a user with the same username or email already exists.
+   * @throws {ConflictException} - If a user with the same username already exists.
    */
   async create(dto: CreateUserDto): Promise<UserEntity> {
     const user = this.usersRepo.create(dto);
@@ -112,7 +99,7 @@ export class UsersService {
    * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
-   * @throws {ConflictException} - If a user with the same username or email already exists.
+   * @throws {ConflictException} - If a user with the same username already exists.
    */
   async update(userId: number, dto: UpdateUserDto) {
     if (Object.keys(dto).length === 0) {
@@ -128,7 +115,6 @@ export class UsersService {
         return {
           userId: updatedUser.userId,
           username: updatedUser.username,
-          email: updatedUser.email,
         };
       } else {
         this.logger.warn(`No user found with ID ${userId} to update`);
@@ -143,9 +129,6 @@ export class UsersService {
         if (e.query.includes('username')) {
           this.logger.warn(`User with username ${dto.username} already exists`);
           throw new ConflictException('User already exists');
-        } else if (e.query.includes('email')) {
-          this.logger.warn(`User with email ${dto.email} already exists`);
-          throw new ConflictException('Email already exists');
         } else {
           this.logger.error(`Unexpected error: ${e.message}`);
           throw new Error('Unexpected error');

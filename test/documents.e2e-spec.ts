@@ -35,14 +35,13 @@ describe('E2E - Documents Endpoints', () => {
     const user = await db.getRepository(UserEntity).save({
       username: 'john_doe',
       password: '123',
-      email: 'test@example.com',
     });
     userId = user.userId;
 
     authToken = (
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+        .send({ username: 'john_doe', password: '123' })
     ).body.token;
   });
 
@@ -84,7 +83,6 @@ describe('E2E - Documents Endpoints', () => {
           userId,
           username: 'john_doe',
           password: '123',
-          email: 'test@example.com',
         },
       });
     });
