@@ -201,6 +201,41 @@ describe('E2E - Users Endpoints', () => {
     });
   });
 
+  describe('Read - Get by Username', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer())
+        .get('/users/john_doe')
+        .expect(401)
+        .expect((res) => {
+          expect(res.body.message).toBe('Unauthorized');
+        });
+    });
+
+    it('Get user by username successfully', () => {
+      return request(app.getHttpServer())
+        .get('/users/by-username/john_doe')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toMatchObject({
+            userId: userId,
+            username: 'john_doe',
+            password: '123',
+          });
+        });
+    });
+
+    it('Get user by username - not found', () => {
+      return request(app.getHttpServer())
+        .get('/users/by-username/nonexistent_user')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toEqual({});
+        });
+    });
+  });
+
   describe('Update', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer())
