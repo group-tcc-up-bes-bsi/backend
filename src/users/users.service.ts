@@ -118,7 +118,7 @@ export class UsersService {
         const updatedUser = await this.findOne(userId);
         return {
           userId: updatedUser.userId,
-          username: updatedUser.username,
+          password: updatedUser.password,
         };
       } else {
         this.logger.warn(`No user found with ID ${userId} to update`);
@@ -127,16 +127,6 @@ export class UsersService {
     } catch (e) {
       if (e.name === 'NotFoundException') {
         throw e;
-      }
-
-      if (e.sqlMessage.includes('Duplicate entry')) {
-        if (e.query.includes('username')) {
-          this.logger.warn(`User with username ${dto.username} already exists`);
-          throw new ConflictException('User already exists');
-        } else {
-          this.logger.error(`Unexpected error: ${e.message}`);
-          throw new Error('Unexpected error');
-        }
       }
 
       this.logger.error(`Error updating user with ID ${userId}`, e.stack);

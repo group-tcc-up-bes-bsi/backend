@@ -244,7 +244,7 @@ describe('E2E - Users Endpoints', () => {
         .expect((res) => {
           expect(res.body).toStrictEqual({
             userId: userId,
-            username: 'updated_user',
+            password: 'newpassword123',
           });
         })
         .expect(() => {
@@ -262,12 +262,12 @@ describe('E2E - Users Endpoints', () => {
     it('User updated successfully - Only 1 param', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .send({ username: 'new_john_doe' })
+        .send({ password: '12341234' })
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
             userId: userId,
-            username: 'new_john_doe',
+            password: '12341234',
           });
         })
         .expect(() => {
@@ -276,8 +276,8 @@ describe('E2E - Users Endpoints', () => {
             .then((user) => {
               expect(user).toMatchObject({
                 userId: userId,
-                username: 'new_john_doe',
-                password: '123',
+                username: 'john_doe',
+                password: '12341234',
               });
             });
         });
