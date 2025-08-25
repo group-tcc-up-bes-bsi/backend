@@ -64,7 +64,6 @@ export class UsersController {
    * @param {string} username - The username of the user to retrieve.
    * @returns {Promise<User>} - A promise that resolves to the user object.
    */
-  @UseGuards(AuthGuard)
   @Get('by-username/:username')
   async findByUsername(@Param('username') username: string) {
     const user = await this.usersService.findByUsername(username);

@@ -43,6 +43,10 @@ export class UsersService {
     const user = await this.usersRepo.findOne({
       where: { username },
     });
+    if (user == null) {
+      this.logger.warn(`User with username ${username} not found`);
+      throw new NotFoundException('User not found');
+    }
     return user;
   }
 
