@@ -3,20 +3,43 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
 import { Document } from 'src/documents/entities/document.entity';
+import { flushDatabase, flushDatabaseTable, saveTestUser } from './helpers/database-utils';
+import { createTestOrganization, makeTestLogin } from './helpers/endpoint-utils';
+import { OrganizationType } from 'src/organizations/entities/organization.entity';
 
-describe.skip('E2E - Documents Endpoints', () => {
+//////////////////////////////////////////////////////////////////////
+// Test entity objects
+///////////////////////////////////////////////////////////////////////
+
+const testUser = {
+  username: 'john_doe',
+  password: '123',
+  email: 'test@example.com',
+};
+
+const testOrganization = {
+  name: 'Test Org',
+  description: 'Test Description',
+  organizationType: OrganizationType.INDIVIDUAL,
+};
+
+const testDocument = {
+  name: 'test document',
+  type: 'PDF',
+  description: 'some test document',
+  organizationId: null,
+};
+
+//////////////////////////////////////////////////////////////////////
+// Testcases
+///////////////////////////////////////////////////////////////////////
+
+describe('E2E - Documents Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
   let userId: number;
-
-  const testDocument = {
-    documentName: 'test document',
-    documentType: 'PDF',
-    documentDescription: 'some test document',
-  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -27,34 +50,22 @@ describe.skip('E2E - Documents Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
+    await flushDatabase(db);
 
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(User).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
-
-    const user = await db.getRepository(User).save({
-      username: 'john_doe',
-      password: '123',
-      email: 'test@example.com',
-    });
-    userId = user.userId;
-
-    authToken = (
-      await request(app.getHttpServer()).post('/auth/login').send({ email: 'test@example.com', password: '123' })
-    ).body.token;
+    userId = await saveTestUser(db, testUser);
+    authToken = await makeTestLogin(app, testUser);
+    testDocument.organizationId = await createTestOrganization(app, authToken, testOrganization);
   });
 
   beforeEach(async () => {
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(Document).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabaseTable(db, [Document]);
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  describe('Create', () => {
+  describe.only('Create', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).post('/documents').send(testDocument).expect(401);
     });
@@ -71,17 +82,17 @@ describe.skip('E2E - Documents Endpoints', () => {
         documentId: expect.any(Number),
       });
 
-      expect(await db.getRepository(Document).findOneBy({ documentId: body.documentId })).toMatchObject({
+      expect(
+        await db.getRepository(Document).findOne({
+          where: { documentId: body.documentId },
+          relations: ['organization'],
+        }),
+      ).toMatchObject({
         ...testDocument,
         documentId: body.documentId,
-        documentCreationDate: expect.any(Date),
-        documentLastModifiedDate: expect.any(Date),
-        owner: {
-          userId,
-          username: 'john_doe',
-          password: '123',
-          email: 'test@example.com',
-        },
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+        organization: testOrganization,
       });
     });
 
@@ -93,9 +104,10 @@ describe.skip('E2E - Documents Endpoints', () => {
 
       expect(body).toMatchObject({
         message: [
-          'documentName must be a string',
-          'documentType must be a string',
-          'documentDescription must be a string',
+          'name must be a string',
+          'type must be a string',
+          'description must be a string',
+          'organizationId must be a number conforming to the specified constraints',
         ],
       });
     });

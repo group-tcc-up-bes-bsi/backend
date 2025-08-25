@@ -50,8 +50,9 @@ export class DocumentsService {
    */
   private async checkEditPermission(userId: number, organizationId: number): Promise<void> {
     const roleArray = [UserType.OWNER, UserType.WRITE];
-    if (!this.organizationsService.checkUserRole(userId, organizationId, roleArray)) {
-      throw new ForbiddenException();
+    const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, roleArray);
+    if (!hasPermission) {
+      throw new ForbiddenException(`User ${userId} does not have permission to edit in organization ${organizationId}`);
     }
   }
 
@@ -105,8 +106,15 @@ export class DocumentsService {
   async createDocument(requestUserId: number, dto: CreateDocumentDto) {
     await this.checkEditPermission(requestUserId, dto.organizationId);
 
+    const organization = await this.organizationsService.findOneOrganization(dto.organizationId);
+
     return this.documentsRepo
-      .save(this.documentsRepo.create(dto))
+      .save(
+        this.documentsRepo.create({
+          ...dto,
+          organization,
+        }),
+      )
       .then(({ documentId }) => {
         this.logger.debug(`Document Id ${documentId} saved successfully`);
         return {

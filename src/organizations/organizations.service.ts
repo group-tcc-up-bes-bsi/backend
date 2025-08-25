@@ -43,9 +43,11 @@ export class OrganizationsService {
    */
   private checkIfUserExistsOnOrganization(userId: number, organizationId: number) {
     return this.organizationUserRepo
-      .findOneBy({
-        organizationId,
-        userId,
+      .findOne({
+        where: {
+          user: { userId },
+          organization: { organizationId },
+        },
       })
       .then((user) => {
         if (!user) {
@@ -92,7 +94,7 @@ export class OrganizationsService {
   }
 
   ///////////////////////////////////////////////////////////////////////
-  // Private Organization functions
+  // Public Organization interfaces
   ///////////////////////////////////////////////////////////////////////
 
   /**
@@ -100,7 +102,7 @@ export class OrganizationsService {
    * @param {number} organizationId - The ID of the organization to retrieve.
    * @returns {Organization} - The organization entity if found.
    */
-  private async findOneOrganization(organizationId: number) {
+  async findOneOrganization(organizationId: number) {
     const organization = await this.organizationsRepo.findOne({
       where: { organizationId },
       relations: ['organizationUsers'],
@@ -112,10 +114,6 @@ export class OrganizationsService {
     }
     return organization;
   }
-
-  ///////////////////////////////////////////////////////////////////////
-  // Public Organization interfaces
-  ///////////////////////////////////////////////////////////////////////
 
   /**
    * Creates a new organization.
