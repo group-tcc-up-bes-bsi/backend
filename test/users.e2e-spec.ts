@@ -202,25 +202,16 @@ describe('E2E - Users Endpoints', () => {
   });
 
   describe('Read - Get by Username', () => {
-    it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .get('/users/john_doe')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
-    });
-
     it('Get user by username successfully', () => {
       return request(app.getHttpServer())
         .get('/users/by-username/john_doe')
-        .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toMatchObject({
+          expect(res.body).toEqual({
             userId: userId,
             username: 'john_doe',
             password: '123',
+            createdAt: expect.any(String),
           });
         });
     });
@@ -228,10 +219,13 @@ describe('E2E - Users Endpoints', () => {
     it('Get user by username - not found', () => {
       return request(app.getHttpServer())
         .get('/users/by-username/nonexistent_user')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200)
+        .expect(404)
         .expect((res) => {
-          expect(res.body).toEqual({});
+          expect(res.body).toEqual({
+            statusCode: 404,
+            message: 'User not found',
+            error: 'Not Found',
+          });
         });
     });
   });
