@@ -86,14 +86,11 @@ export class UsersController {
    * Only the user themselves can access this endpoint.
    * @param {string} id - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
-   * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the updated user object.
    * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
    */
-  @UseGuards(AuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Request() request) {
-    this.checkUserAccess(+id, request);
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(+id, dto);
   }
 

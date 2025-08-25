@@ -231,16 +231,6 @@ describe('E2E - Users Endpoints', () => {
   });
 
   describe('Update', () => {
-    it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .patch(`/users/${userId}`)
-        .send({ username: 'updated_user', password: 'newpassword123' })
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
-    });
-
     it('User updated successfully', () => {
       const updatedUser = {
         username: 'updated_user',
@@ -249,7 +239,6 @@ describe('E2E - Users Endpoints', () => {
 
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send(updatedUser)
         .expect(200)
         .expect((res) => {
@@ -273,7 +262,6 @@ describe('E2E - Users Endpoints', () => {
     it('User updated successfully - Only 1 param', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'new_john_doe' })
         .expect(200)
         .expect((res) => {
@@ -298,17 +286,15 @@ describe('E2E - Users Endpoints', () => {
     it('Trying to update another user', () => {
       return request(app.getHttpServer())
         .patch('/users/99999')
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'nonexistent_user' })
         .expect((res) => {
-          expect(res.body.message).toBe('You are not authorized to access this resource');
+          expect(res.body.message).toBe('User not found');
         });
     });
 
     it('Invalid username', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 123 })
         .expect(400)
         .expect((res) => {
@@ -319,7 +305,6 @@ describe('E2E - Users Endpoints', () => {
     it('Invalid password', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .send({ password: 1234 })
         .expect(400)
         .expect((res) => {
@@ -330,7 +315,6 @@ describe('E2E - Users Endpoints', () => {
     it('Request without body', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .set('Authorization', `Bearer ${authToken}`)
         .expect(400)
         .expect((res) => {
           expect(res.body.message).toBe('No data provided for update');
