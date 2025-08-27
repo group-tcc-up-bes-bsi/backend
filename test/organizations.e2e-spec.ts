@@ -3,11 +3,44 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
 import { Organization, OrganizationType } from 'src/organizations/entities/organization.entity';
 import { OrganizationUser, UserType } from 'src/organizations/entities/organization-user.entity';
+import { flushDatabase, flushDatabaseTable, saveTestUser } from './helpers/database-utils';
+import { makeTestLogin } from './helpers/endpoint-utils';
 
-describe.skip('E2E - Organizations Endpoints', () => {
+//////////////////////////////////////////////////////////////////////
+// Test entity objects
+///////////////////////////////////////////////////////////////////////
+
+const testUser = {
+  username: 'john_doe',
+  password: '123',
+  email: 'test@example.com',
+};
+
+const testUser2 = {
+  username: 'new_john',
+  password: '1234',
+  email: 'newTest@example.com',
+};
+
+const testUser3 = {
+  username: 'jane_doe',
+  password: '123',
+  email: 'jane@example.com',
+};
+
+const testOrganization = {
+  name: 'Test Org',
+  description: 'Test Description',
+  organizationType: OrganizationType.INDIVIDUAL,
+};
+
+//////////////////////////////////////////////////////////////////////
+// Testcases
+///////////////////////////////////////////////////////////////////////
+
+describe('E2E - Organizations Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let authToken: string;
@@ -18,12 +51,6 @@ describe.skip('E2E - Organizations Endpoints', () => {
   let userId3: number;
   let testOrganizationId: number;
 
-  const testOrganization = {
-    name: 'Test Org',
-    description: 'Test Description',
-    organizationType: OrganizationType.INDIVIDUAL,
-  };
-
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -33,52 +60,21 @@ describe.skip('E2E - Organizations Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(OrganizationUser).clear();
-    await db.getRepository(Organization).clear();
-    await db.getRepository(User).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabase(db);
 
-    const user = await db.getRepository(User).save({
-      username: 'john_doe',
-      password: '123',
-      email: 'test@example.com',
-    });
-    userId = user.userId;
+    userId = await saveTestUser(db, testUser);
+    authToken = await makeTestLogin(app, testUser);
 
-    authToken = (
-      await request(app.getHttpServer()).post('/auth/login').send({ email: 'test@example.com', password: '123' })
-    ).body.token;
+    userId2 = await saveTestUser(db, testUser2);
+    authToken2 = await makeTestLogin(app, testUser2);
 
-    const user2 = await db.getRepository(User).save({
-      username: 'new_john',
-      password: '1234',
-      email: 'newTest@example.com',
-    });
-    userId2 = user2.userId;
-
-    authToken2 = (
-      await request(app.getHttpServer()).post('/auth/login').send({ email: 'newTest@example.com', password: '1234' })
-    ).body.token;
-
-    const user3 = await db.getRepository(User).save({
-      username: 'jane_doe',
-      password: '123',
-      email: 'jane@example.com',
-    });
-    userId3 = user3.userId;
-
-    authToken3 = (
-      await request(app.getHttpServer()).post('/auth/login').send({ email: 'jane@example.com', password: '123' })
-    ).body.token;
+    userId3 = await saveTestUser(db, testUser3);
+    authToken3 = await makeTestLogin(app, testUser3);
   });
 
   afterEach(async () => {
     testOrganizationId = null;
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(OrganizationUser).clear();
-    await db.getRepository(Organization).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabaseTable(db, [OrganizationUser, Organization]);
   });
 
   afterAll(async () => {
@@ -96,6 +92,7 @@ describe.skip('E2E - Organizations Endpoints', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(testOrganization)
         .expect(201);
+
       const { organizationId } = body;
 
       // Check response body
@@ -111,9 +108,7 @@ describe.skip('E2E - Organizations Endpoints', () => {
       });
 
       // Check OrganizationUser table in the database.
-      expect(
-        await db.getRepository(OrganizationUser).findOneBy({ user: { userId }, organization: { organizationId } }),
-      ).toMatchObject({
+      expect(await db.getRepository(OrganizationUser).findOneBy({ userId, organizationId })).toMatchObject({
         organizationUserId: expect.any(Number),
         userType: UserType.OWNER,
         inviteAccepted: true,
@@ -132,7 +127,7 @@ describe.skip('E2E - Organizations Endpoints', () => {
         message: [
           'name must be a string',
           'description must be a string',
-          'organizationType must be one of the following values: Individual, Collaborative',
+          'organizationType must be one of the following values: individual, collaborative',
         ],
       });
     });
@@ -205,7 +200,7 @@ describe.skip('E2E - Organizations Endpoints', () => {
         .expect(400)
         .expect((res) => {
           expect(res.body.message).toContain(
-            'organizationType must be one of the following values: Individual, Collaborative',
+            'organizationType must be one of the following values: individual, collaborative',
           );
         });
     });
@@ -1225,7 +1220,7 @@ describe.skip('E2E - Organizations Endpoints', () => {
         organizationId: 1,
         name: 'Test Org',
         description: 'Test Description',
-        organizationType: 'Collaborative',
+        organizationType: 'collaborative',
         organizationUsers: [
           {
             user: 'john_doe',

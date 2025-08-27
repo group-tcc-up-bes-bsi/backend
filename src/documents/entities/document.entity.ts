@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, RelationId } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Organization } from 'src/organizations/entities/organization.entity';
 import { DocumentVersion } from 'src/document-versions/entities/document-version.entity';
 
@@ -35,6 +35,6 @@ export class Document {
   @JoinColumn({ name: 'organizationId' })
   organization: Organization;
 
-  @RelationId((document: Document) => document.organization)
+  @Column()
   organizationId: number;
 }

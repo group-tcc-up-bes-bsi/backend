@@ -105,16 +105,8 @@ export class DocumentsService {
    */
   async createDocument(requestUserId: number, dto: CreateDocumentDto) {
     await this.checkEditPermission(requestUserId, dto.organizationId);
-
-    const organization = await this.organizationsService.findOneOrganization(dto.organizationId);
-
     return this.documentsRepo
-      .save(
-        this.documentsRepo.create({
-          ...dto,
-          organization,
-        }),
-      )
+      .save(this.documentsRepo.create(dto))
       .then(({ documentId }) => {
         this.logger.debug(`Document Id ${documentId} saved successfully`);
         return {

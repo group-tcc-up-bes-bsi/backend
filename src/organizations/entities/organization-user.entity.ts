@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, RelationId } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { Organization } from 'src/organizations/entities/organization.entity';
 
@@ -33,7 +33,7 @@ export class OrganizationUser {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @RelationId((orgUser: OrganizationUser) => orgUser.user)
+  @Column()
   userId: number;
 
   /* ------------- The organization that the user is part of ------------- */
@@ -43,6 +43,6 @@ export class OrganizationUser {
   @JoinColumn({ name: 'organizationId' })
   organization: Organization;
 
-  @RelationId((orgUser: OrganizationUser) => orgUser.organization)
+  @Column()
   organizationId: number;
 }
