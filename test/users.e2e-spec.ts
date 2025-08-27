@@ -4,6 +4,7 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
+import { flushDatabase, flushDatabaseTable } from './helpers/database-utils';
 
 describe('E2E - Users Endpoints', () => {
   let app: INestApplication;
@@ -20,12 +21,11 @@ describe('E2E - Users Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
+    await flushDatabase(db);
   });
 
   beforeEach(async () => {
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(User).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabaseTable(db, [User]);
 
     const user = await db.getRepository(User).save({
       username: 'john_doe',
