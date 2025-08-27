@@ -231,6 +231,16 @@ describe('E2E - Users Endpoints', () => {
   });
 
   describe('Update', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer())
+        .patch(`/users/${userId}`)
+        .send({ username: 'updated_user', password: 'newpassword123' })
+        .expect(401)
+        .expect((res) => {
+          expect(res.body.message).toBe('Unauthorized');
+        });
+    });
+
     it('User updated successfully', () => {
       const updatedUser = {
         username: 'updated_user',
@@ -239,12 +249,13 @@ describe('E2E - Users Endpoints', () => {
 
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .send(updatedUser)
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
             userId: userId,
-            password: 'newpassword123',
+            username: 'updated_user',
           });
         })
         .expect(() => {
@@ -262,12 +273,13 @@ describe('E2E - Users Endpoints', () => {
     it('User updated successfully - Only 1 param', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
-        .send({ password: '12341234' })
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ username: 'john_doe' })
         .expect(200)
         .expect((res) => {
           expect(res.body).toStrictEqual({
             userId: userId,
-            password: '12341234',
+            username: 'john_doe',
           });
         })
         .expect(() => {
@@ -277,7 +289,7 @@ describe('E2E - Users Endpoints', () => {
               expect(user).toMatchObject({
                 userId: userId,
                 username: 'john_doe',
-                password: '12341234',
+                password: '123',
               });
             });
         });
@@ -286,15 +298,17 @@ describe('E2E - Users Endpoints', () => {
     it('Trying to update another user', () => {
       return request(app.getHttpServer())
         .patch('/users/99999')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 'nonexistent_user' })
         .expect((res) => {
-          expect(res.body.message).toBe('User not found');
+          expect(res.body.message).toBe('You are not authorized to access this resource');
         });
     });
 
     it('Invalid username', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .send({ username: 123 })
         .expect(400)
         .expect((res) => {
@@ -305,6 +319,7 @@ describe('E2E - Users Endpoints', () => {
     it('Invalid password', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .send({ password: 1234 })
         .expect(400)
         .expect((res) => {
@@ -315,6 +330,7 @@ describe('E2E - Users Endpoints', () => {
     it('Request without body', () => {
       return request(app.getHttpServer())
         .patch(`/users/${userId}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(400)
         .expect((res) => {
           expect(res.body.message).toBe('No data provided for update');

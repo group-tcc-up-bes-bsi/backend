@@ -103,12 +103,67 @@ export class UsersService {
    * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
-   * @throws {ConflictException} - If a user with the same username already exists.
+   * @throws {ConflictException} - If a user with the same username or email already exists.
    */
   async update(userId: number, dto: UpdateUserDto) {
     if (Object.keys(dto).length === 0) {
       this.logger.warn(`No data provided for update userId ${userId}`);
       throw new BadRequestException('No data provided for update');
+    }
+
+    try {
+      const result = await this.usersRepo.update(userId, dto);
+      if (result.affected > 0) {
+        this.logger.log(`User with ID ${userId} successfully updated`);
+        const updatedUser = await this.findOne(userId);
+        return {
+          userId: updatedUser.userId,
+          username: updatedUser.username,
+        };
+      } else {
+        this.logger.warn(`No user found with ID ${userId} to update`);
+        throw new NotFoundException('User not found');
+      }
+    } catch (e) {
+      if (e.name === 'NotFoundException') {
+        throw e;
+      }
+
+      if (e.sqlMessage.includes('Duplicate entry')) {
+        if (e.query.includes('username')) {
+          this.logger.warn(`User with username ${dto.username} already exists`);
+          throw new ConflictException('User already exists');
+        } else {
+          this.logger.error(`Unexpected error: ${e.message}`);
+          throw new Error('Unexpected error');
+        }
+      }
+
+      this.logger.error(`Error updating user with ID ${userId}`, e.stack);
+      throw new Error('Error updating user');
+    }
+  }
+
+  /**
+   * Updates an existing user.
+   * @param {number} userId - The ID of the user to update.
+   * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
+   * @param {string} adminPass - The new password for the user.
+   * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
+   * @throws {BadRequestException} - If no data is provided for update.
+   * @throws {NotFoundException} - If the user with the specified ID does not exist.
+   * @throws {ConflictException} - If a user with the same username already exists.
+   */
+  async updatePassword(userId: number, dto: UpdateUserDto, adminPass: string) {
+    if (!adminPass) {
+      this.logger.warn(`No AdminPass provided for update userId ${userId}`);
+      throw new BadRequestException('No AdminPass provided for update');
+    }
+
+    //${process.env.ADMIN_PASS} @joão consegue verificar como usar o env aqui, pois o mesmo esta vindo undefined
+    if (adminPass !== `doc_dash`) {
+      this.logger.warn(`AdminPass is incorrect for update userId ${userId}`);
+      throw new BadRequestException('Invalid AdminPass');
     }
 
     try {

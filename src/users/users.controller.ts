@@ -82,15 +82,34 @@ export class UsersController {
   }
 
   /**
+   * Updates the password of an existing user.
+   * Only the user themselves or an admin can access this endpoint.
+   * @param {string} id - The ID of the user to update.
+   * @param {object} body - The body containing the dto and adminPass.
+   * @param {UpdateUserDto} body.dto - The data transfer object containing updated user information.
+   * @param {string} body.adminPass - The new password for the user (should be inside the body).
+   * @returns {Promise<{}>} - A promise that resolves to the updated user object.
+   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   */
+  @Patch('update-password/:id')
+  updatePassword(@Param('id') id: string, @Body() body: { dto: UpdateUserDto; adminPass: string }) {
+    const { dto, adminPass } = body;
+    return this.usersService.updatePassword(+id, dto, adminPass);
+  }
+
+  /**
    * Updates an existing user.
    * Only the user themselves can access this endpoint.
    * @param {string} id - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
+   * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the updated user object.
    * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
    */
+  @UseGuards(AuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Request() request) {
+    this.checkUserAccess(+id, request);
     return this.usersService.update(+id, dto);
   }
 
