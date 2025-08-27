@@ -48,7 +48,7 @@ export async function addToTestOrganization(app: INestApplication, authToken: st
  * @param {string} authToken - The authorization token.
  * @param {OrgOptions} options - The options for removing a user from the organization.
  */
-export async function removeFromTestOrganization(app: INestApplication, authToken: string, options: OrgOptions){
+export async function removeFromTestOrganization(app: INestApplication, authToken: string, options: OrgOptions) {
   await request(app.getHttpServer())
     .delete(`/organizations/removeUser/${options.organizationId}/${options.userId}`)
     .set('Authorization', `Bearer ${authToken}`)
