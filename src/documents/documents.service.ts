@@ -37,8 +37,9 @@ export class DocumentsService {
    */
   private async checkReadPermission(userId: number, organizationId: number): Promise<void> {
     const roleArray = [UserType.OWNER, UserType.WRITE, UserType.READ];
-    if (!this.organizationsService.checkUserRole(userId, organizationId, roleArray)) {
-      throw new ForbiddenException();
+    const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, roleArray);
+    if (!hasPermission) {
+      throw new ForbiddenException('You are not part of the organization');
     }
   }
 
@@ -52,7 +53,7 @@ export class DocumentsService {
     const roleArray = [UserType.OWNER, UserType.WRITE];
     const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, roleArray);
     if (!hasPermission) {
-      throw new ForbiddenException(`User ${userId} does not have permission to edit in organization ${organizationId}`);
+      throw new ForbiddenException('You do not have edit permissions in this organization');
     }
   }
 
@@ -63,8 +64,9 @@ export class DocumentsService {
    * @throws {ForbiddenException} - If the user is not Writer or Owner.
    */
   private async checkOwnerPermission(userId: number, organizationId: number): Promise<void> {
-    if (!this.organizationsService.checkUserRole(userId, organizationId, [UserType.OWNER])) {
-      throw new ForbiddenException();
+    const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, [UserType.OWNER]);
+    if (!hasPermission) {
+      throw new ForbiddenException('You do not have owner permissions in this organization');
     }
   }
 

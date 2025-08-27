@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { UserType } from 'src/organizations/entities/organization-user.entity';
 import * as request from 'supertest';
 
 /**
@@ -15,6 +16,43 @@ export async function createTestOrganization(app: INestApplication, authToken: s
     .send(testOrganization)
     .expect(201);
   return response.body.organizationId;
+}
+
+interface OrgOptions {
+  userId: number | string;
+  organizationId: number | string;
+  role?: keyof typeof UserType;
+}
+
+/**
+ * Adds a user to a test organization.
+ * @param {INestApplication} app - The Nest application instance.
+ * @param {string} authToken - The authorization token.
+ * @param {OrgOptions} options - The options for adding a user to the organization.
+ */
+export async function addToTestOrganization(app: INestApplication, authToken: string, options: OrgOptions) {
+  await request(app.getHttpServer())
+    .post(`/organizations/addUser`)
+    .set('Authorization', `Bearer ${authToken}`)
+    .send({
+      userId: options.userId,
+      organizationId: options.organizationId,
+      userType: UserType[options.role],
+    })
+    .expect(201);
+}
+
+/**
+ * Removes a user from a test organization.
+ * @param {INestApplication} app - The Nest application instance.
+ * @param {string} authToken - The authorization token.
+ * @param {OrgOptions} options - The options for removing a user from the organization.
+ */
+export async function removeFromTestOrganization(app: INestApplication, authToken: string, options: OrgOptions){
+  await request(app.getHttpServer())
+    .delete(`/organizations/removeUser/${options.organizationId}/${options.userId}`)
+    .set('Authorization', `Bearer ${authToken}`)
+    .expect(200);
 }
 
 /**

@@ -84,11 +84,16 @@ export class OrganizationsService {
    * @returns {Promise<boolean>} - A promise that resolves true if the user has the expected role.
    */
   async checkUserRole(userId: number, orgId: number, expectedRoles: Array<UserType>): Promise<boolean> {
-    const user = await this.checkIfUserExistsOnOrganization(userId, orgId);
-    if (expectedRoles.includes(user?.userType)) {
-      return true;
+    try {
+      const user = await this.checkIfUserExistsOnOrganization(userId, orgId);
+      if (expectedRoles.includes(user?.userType)) {
+        return true;
+      }
+      return false;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e) {
+      return false;
     }
-    return false;
   }
 
   ///////////////////////////////////////////////////////////////////////

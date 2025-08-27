@@ -5,7 +5,7 @@ import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
 import { Document } from 'src/documents/entities/document.entity';
 import { flushDatabase, flushDatabaseTable, saveTestUser } from './helpers/database-utils';
-import { createTestOrganization, makeTestLogin } from './helpers/endpoint-utils';
+import * as epUtils from './helpers/endpoint-utils';
 import { OrganizationType } from 'src/organizations/entities/organization.entity';
 
 //////////////////////////////////////////////////////////////////////
@@ -18,10 +18,16 @@ const testUser = {
   email: 'test@example.com',
 };
 
+const testUser2 = {
+  username: 'jane_doe',
+  password: '123',
+  email: 'jane@example.com',
+};
+
 const testOrganization = {
   name: 'Test Org',
   description: 'Test Description',
-  organizationType: OrganizationType.INDIVIDUAL,
+  organizationType: OrganizationType.COLLABORATIVE,
 };
 
 const testDocument = {
@@ -38,8 +44,11 @@ const testDocument = {
 describe('E2E - Documents Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
+  let organizationId: number;
   let authToken: string;
   let userId: number;
+  let authToken2: string;
+  let userId2: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -53,8 +62,12 @@ describe('E2E - Documents Endpoints', () => {
     await flushDatabase(db);
 
     userId = await saveTestUser(db, testUser);
-    authToken = await makeTestLogin(app, testUser);
-    testDocument.organizationId = await createTestOrganization(app, authToken, testOrganization);
+    authToken = await epUtils.makeTestLogin(app, testUser);
+    organizationId = await epUtils.createTestOrganization(app, authToken, testOrganization);
+    testDocument.organizationId = organizationId;
+
+    userId2 = await saveTestUser(db, testUser2);
+    authToken2 = await epUtils.makeTestLogin(app, testUser2);
   });
 
   beforeEach(async () => {
@@ -65,7 +78,7 @@ describe('E2E - Documents Endpoints', () => {
     await app.close();
   });
 
-  describe.only('Create', () => {
+  describe('Create', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).post('/documents').send(testDocument).expect(401);
     });
@@ -113,7 +126,7 @@ describe('E2E - Documents Endpoints', () => {
     });
   });
 
-  describe('Read - Get all', () => {
+  describe.skip('Read - Get all my documents', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).get('/documents').expect(401);
     });
@@ -151,10 +164,6 @@ describe('E2E - Documents Endpoints', () => {
       return request(app.getHttpServer()).get('/documents/1').expect(401);
     });
 
-    it('Document not found', () => {
-      return request(app.getHttpServer()).get('/documents/999').set('Authorization', `Bearer ${authToken}`).expect(404);
-    });
-
     it('Get document by ID', async () => {
       const { body } = await request(app.getHttpServer())
         .post('/documents')
@@ -172,15 +181,108 @@ describe('E2E - Documents Endpoints', () => {
           expect(body).toMatchObject({
             ...testDocument,
             documentId,
-            documentCreationDate: expect.any(String),
-            documentLastModifiedDate: expect.any(String),
-            owner: userId,
+            creationDate: expect.any(String),
+            lastModifiedDate: expect.any(String),
           });
         });
     });
+
+    it('Get document by ID - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .get(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            ...testDocument,
+            documentId,
+            creationDate: expect.any(String),
+            lastModifiedDate: expect.any(String),
+          });
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get document by ID - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .get(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            ...testDocument,
+            documentId,
+            creationDate: expect.any(String),
+            lastModifiedDate: expect.any(String),
+          });
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get document by ID - user is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .get(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You are not part of the organization',
+            statusCode: 403,
+          });
+        });
+    });
+
+    it('Document not found', () => {
+      return request(app.getHttpServer()).get('/documents/999').set('Authorization', `Bearer ${authToken}`).expect(404);
+    });
   });
 
-  describe('Update', () => {
+  describe.skip('Update', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).patch('/documents/1').send(testDocument).expect(401);
     });
@@ -249,7 +351,7 @@ describe('E2E - Documents Endpoints', () => {
     });
   });
 
-  describe('Delete', () => {
+  describe.skip('Delete', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).delete('/documents/1').send(testDocument).expect(401);
     });
