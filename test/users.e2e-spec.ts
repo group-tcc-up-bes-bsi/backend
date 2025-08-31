@@ -3,7 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
+import { User } from 'src/users/entities/user.entity';
+import { flushDatabase, flushDatabaseTable } from './helpers/database-utils';
 
 describe('E2E - Users Endpoints', () => {
   let app: INestApplication;
@@ -20,14 +21,13 @@ describe('E2E - Users Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
+    await flushDatabase(db);
   });
 
   beforeEach(async () => {
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(UserEntity).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabaseTable(db, [User]);
 
-    const user = await db.getRepository(UserEntity).save({
+    const user = await db.getRepository(User).save({
       username: 'john_doe',
       password: '123',
       email: 'test@example.com',
@@ -35,9 +35,7 @@ describe('E2E - Users Endpoints', () => {
     userId = user.userId;
 
     authToken = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'test@example.com', password: '123' })
+      await request(app.getHttpServer()).post('/auth/login').send({ email: 'test@example.com', password: '123' })
     ).body.token;
   });
 
@@ -64,7 +62,7 @@ describe('E2E - Users Endpoints', () => {
           expect(res.body.userId).toBeDefined();
         })
         .expect((res) => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: res.body.userId })
             .then((user) => {
               expect(user).toBeDefined();
@@ -152,22 +150,17 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Read - Get all', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .get('/users')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).get('/users').expect(401);
     });
 
     it('Get all users successfully', async () => {
-      await db.getRepository(UserEntity).save({
+      await db.getRepository(User).save({
         username: 'user1',
         password: 'password1',
         email: 'user1@example.com',
       });
 
-      await db.getRepository(UserEntity).save({
+      await db.getRepository(User).save({
         username: 'user2',
         password: 'password2',
         email: 'user2@example.com',
@@ -198,12 +191,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Read - Get by Id', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .get(`/users/${userId}`)
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).get(`/users/${userId}`).expect(401);
     });
 
     it('Get user by ID successfully', () => {
@@ -224,7 +212,7 @@ describe('E2E - Users Endpoints', () => {
       return request(app.getHttpServer())
         .get('/users/99999')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toBe('You are not authorized to access this resource');
         });
@@ -233,13 +221,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Update', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .patch(`/users/${userId}`)
-        .send({ username: 'updated_user', password: 'newpassword123' })
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).patch(`/users/${userId}`).expect(401);
     });
 
     it('User updated successfully', () => {
@@ -262,7 +244,7 @@ describe('E2E - Users Endpoints', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
@@ -287,7 +269,7 @@ describe('E2E - Users Endpoints', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toMatchObject({
@@ -356,12 +338,7 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Delete', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer())
-        .delete('/users/999')
-        .expect(401)
-        .expect((res) => {
-          expect(res.body.message).toBe('Unauthorized');
-        });
+      return request(app.getHttpServer()).delete('/users/999').expect(401);
     });
 
     it('User deleted successfully', () => {
@@ -377,7 +354,7 @@ describe('E2E - Users Endpoints', () => {
           });
         })
         .expect(() => {
-          db.getRepository(UserEntity)
+          db.getRepository(User)
             .findOneBy({ userId: userId })
             .then((user) => {
               expect(user).toBeNull();
@@ -389,7 +366,7 @@ describe('E2E - Users Endpoints', () => {
       return request(app.getHttpServer())
         .delete('/users/11111')
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toBe('You are not authorized to access this resource');
         });

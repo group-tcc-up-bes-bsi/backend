@@ -8,7 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  UnauthorizedException,
+  ForbiddenException,
   Request,
   Logger,
   Patch,
@@ -36,7 +36,7 @@ export class UsersController {
    * Retrieves all users.
    * //FIXME: Only administrators should be able to access this endpoint
    * @returns {Promise<[]>} - A promise that resolves to an array of users.
-   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
   @Get()
@@ -50,7 +50,7 @@ export class UsersController {
    * @param {string} id - The ID of the user to retrieve.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the user object.
-   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
   @Get(':id')
@@ -77,7 +77,7 @@ export class UsersController {
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the updated user object.
-   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
   @Patch(':id')
@@ -92,7 +92,7 @@ export class UsersController {
    * @param {string} id - The ID of the user to delete.
    * @param {Request} request - The request object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the deleted user object.
-   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
   @Delete(':id')
@@ -106,12 +106,12 @@ export class UsersController {
    * This method checks if the user ID in the request matches the ID of the resource being accessed.
    * @param {number} id - The ID of the resource being accessed.
    * @param {Request} request - The request object containing user information.
-   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
    */
   private checkUserAccess(id: number, @Request() request) {
     if (+request.user.userId !== id) {
       this.logger.warn(`User with ID ${request.user.userId} tried to access user with ID ${id}`);
-      throw new UnauthorizedException('You are not authorized to access this resource');
+      throw new ForbiddenException('You are not authorized to access this resource');
     }
   }
 }

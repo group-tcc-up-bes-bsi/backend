@@ -1,22 +1,9 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UserEntity } from './entities/user.entity';
+import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-
-export type User = {
-  email: string;
-  userId: number;
-  username: string;
-  password: string;
-};
 
 /**
  * Service for managing users.
@@ -28,11 +15,11 @@ export class UsersService {
 
   /**
    * Creates an instance of UsersService.
-   * @param {Repository<UserEntity>} usersRepo - The repository for user entities.
+   * @param {Repository<User>} usersRepo - The repository for user entities.
    */
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly usersRepo: Repository<UserEntity>,
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
   ) {}
 
   /**
@@ -61,7 +48,7 @@ export class UsersService {
 
   /**
    * Retrieves all users.
-   * @returns {Promise<UserEntity[]>} - A promise that resolves to an array of user entities.
+   * @returns {Promise<User[]>} - A promise that resolves to an array of user entities.
    */
   findAll() {
     return this.usersRepo.find();
@@ -70,7 +57,7 @@ export class UsersService {
   /**
    * Retrieves a user by their ID.
    * @param {number} userId - The ID of the user to retrieve.
-   * @returns {Promise<UserEntity>} - A promise that resolves to the user entity if found.
+   * @returns {Promise<User>} - A promise that resolves to the user entity if found.
    */
   async findOne(userId: number) {
     const user = await this.usersRepo.findOneBy({ userId });
@@ -84,16 +71,14 @@ export class UsersService {
   /**
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
-   * @returns {Promise<UserEntity>} - A promise that resolves to the created user entity.
+   * @returns {Promise<User>} - A promise that resolves to the created user entity.
    * @throws {ConflictException} - If a user with the same username or email already exists.
    */
-  async create(dto: CreateUserDto): Promise<UserEntity> {
+  async create(dto: CreateUserDto): Promise<User> {
     const user = this.usersRepo.create(dto);
     try {
       const savedUser = await this.usersRepo.save(user);
-      this.logger.log(
-        `User ${savedUser.username} successfully created with ID ${savedUser.userId}`,
-      );
+      this.logger.log(`User ${savedUser.username} successfully created with ID ${savedUser.userId}`);
       return savedUser;
     } catch (e) {
       if (e.sqlMessage.includes('Duplicate entry')) {
@@ -109,7 +94,7 @@ export class UsersService {
    * Updates an existing user.
    * @param {number} userId - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
-   * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
+   * @returns {Promise<User>} - A promise that resolves to the updated user entity.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
    * @throws {ConflictException} - If a user with the same username or email already exists.
@@ -160,7 +145,7 @@ export class UsersService {
   /**
    * Removes a user by their ID.
    * @param {number} userId - The ID of the user to remove.
-   * @returns {Promise<UserEntity>} - A promise that resolves to the removed user entity.
+   * @returns {Promise<User>} - A promise that resolves to the removed user entity.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
    */
   async remove(userId: number) {

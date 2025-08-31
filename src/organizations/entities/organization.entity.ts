@@ -1,33 +1,39 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { OrganizationUserEntity } from 'src/organizations/entities/organization-user.entity';
+import { OrganizationUser } from 'src/organizations/entities/organization-user.entity';
+import { Document } from 'src/documents/entities/document.entity';
 
 /**
- * Supported organization types
- * INDIVIDUAL - Single-owner org (e.g. freelancer, sole proprietor)
- * COLLABORATIVE - Multi-member org (e.g. company, team)
+ * Supported organization types:
+ * - INDIVIDUAL - Single user.
+ * - COLLABORATIVE - Multiple users.
  */
 export enum OrganizationType {
-  INDIVIDUAL = 'Individual',
-  COLLABORATIVE = 'Collaborative',
+  INDIVIDUAL = 'individual',
+  COLLABORATIVE = 'collaborative',
 }
 
 /**
- * Entity representing the structure of the organization table in the database.
+ * Organization entity.
  */
 @Entity('organizations')
-export class OrganizationEntity {
+export class Organization {
   @PrimaryGeneratedColumn()
   organizationId: number;
 
   @Column()
-  organizationName: string;
+  name: string;
 
   @Column()
-  organizationDescription: string;
+  description: string;
 
   @Column({ type: 'enum', enum: OrganizationType })
   organizationType: OrganizationType;
 
-  @OneToMany(() => OrganizationUserEntity, (orgUser) => orgUser.organization)
-  organizationUsers: OrganizationUserEntity[];
+  /* ------------- The users of this organization ------------- */
+  @OneToMany(() => OrganizationUser, (orgUser) => orgUser.organization)
+  organizationUsers: OrganizationUser[];
+
+  /* ------------- The documents of this organization ------------- */
+  @OneToMany(() => Document, (document) => document.organization)
+  documents: Document[];
 }
