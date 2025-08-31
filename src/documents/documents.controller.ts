@@ -35,7 +35,7 @@ export class DocumentsController {
    * @param {string} id - The ID of the document to retrieve.
    * @returns {Promise<{}>} - A promise that resolves to the document object.
    */
-  @Get(':id')
+  @Get('id/:id')
   findOne(@Request() request, @Param('id') id: string) {
     return this.documentsService.findOne(+request.user.userId, +id);
   }

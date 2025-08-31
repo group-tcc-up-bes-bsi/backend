@@ -145,7 +145,10 @@ export class DocumentsService {
       .then((result) => {
         if (result.affected > 0) {
           this.logger.log(`Document with ID ${documentId} successfully updated`);
-          return 'Document successfully updated';
+          return {
+            message: 'Document successfully updated',
+            documentId,
+          };
         } else {
           this.logger.warn(`No document found with ID ${documentId} to update`);
           throw new NotFoundException('Document not found');
@@ -176,7 +179,10 @@ export class DocumentsService {
         .remove(document)
         .then(() => {
           this.logger.log(`Document with ID ${documentId} successfully removed`);
-          return 'Document successfully removed';
+          return {
+            message: 'Document successfully removed',
+            documentId,
+          };
         })
         .catch((e) => {
           this.logger.error(`Error removing document with ID ${documentId}`, e.stack);
