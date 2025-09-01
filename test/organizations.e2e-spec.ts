@@ -3,15 +3,39 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
-import {
-  OrganizationEntity,
-  OrganizationType,
-} from 'src/organizations/entities/organization.entity';
-import {
-  OrganizationUserEntity,
-  UserType,
-} from 'src/organizations/entities/organization-user.entity';
+import { Organization, OrganizationType } from 'src/organizations/entities/organization.entity';
+import { OrganizationUser, UserType } from 'src/organizations/entities/organization-user.entity';
+import { flushDatabase, flushDatabaseTable, saveTestUser } from './helpers/database-utils';
+import { makeTestLogin } from './helpers/endpoint-utils';
+
+//////////////////////////////////////////////////////////////////////
+// Test entity objects
+///////////////////////////////////////////////////////////////////////
+
+const testUser = {
+  username: 'john_doe',
+  password: '123',
+};
+
+const testUser2 = {
+  username: 'new_john',
+  password: '1234',
+};
+
+const testUser3 = {
+  username: 'jane_doe',
+  password: '123',
+};
+
+const testOrganization = {
+  name: 'Test Org',
+  description: 'Test Description',
+  organizationType: OrganizationType.INDIVIDUAL,
+};
+
+//////////////////////////////////////////////////////////////////////
+// Testcases
+///////////////////////////////////////////////////////////////////////
 
 describe('E2E - Organizations Endpoints', () => {
   let app: INestApplication;
@@ -24,12 +48,6 @@ describe('E2E - Organizations Endpoints', () => {
   let userId3: number;
   let testOrganizationId: number;
 
-  const testOrganization = {
-    organizationName: 'Test Org',
-    organizationDescription: 'Test Description',
-    organizationType: OrganizationType.INDIVIDUAL,
-  };
-
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -39,55 +57,21 @@ describe('E2E - Organizations Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(OrganizationUserEntity).clear();
-    await db.getRepository(OrganizationEntity).clear();
-    await db.getRepository(UserEntity).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabase(db);
 
-    const user = await db.getRepository(UserEntity).save({
-      username: 'john_doe',
-      password: '123',
-    });
-    userId = user.userId;
+    userId = await saveTestUser(db, testUser);
+    authToken = await makeTestLogin(app, testUser);
 
-    authToken = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ username: 'john_doe', password: '123' })
-    ).body.token;
+    userId2 = await saveTestUser(db, testUser2);
+    authToken2 = await makeTestLogin(app, testUser2);
 
-    const user2 = await db.getRepository(UserEntity).save({
-      username: 'new_john',
-      password: '1234',
-    });
-    userId2 = user2.userId;
-
-    authToken2 = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ username: 'new_john', password: '1234' })
-    ).body.token;
-
-    const user3 = await db.getRepository(UserEntity).save({
-      username: 'jane_doe',
-      password: '123',
-    });
-    userId3 = user3.userId;
-
-    authToken3 = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ username: 'jane_doe', password: '123' })
-    ).body.token;
+    userId3 = await saveTestUser(db, testUser3);
+    authToken3 = await makeTestLogin(app, testUser3);
   });
 
   afterEach(async () => {
     testOrganizationId = null;
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(OrganizationUserEntity).clear();
-    await db.getRepository(OrganizationEntity).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabaseTable(db, [OrganizationUser, Organization]);
   });
 
   afterAll(async () => {
@@ -105,6 +89,7 @@ describe('E2E - Organizations Endpoints', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(testOrganization)
         .expect(201);
+
       const { organizationId } = body;
 
       // Check response body
@@ -114,19 +99,13 @@ describe('E2E - Organizations Endpoints', () => {
       });
 
       // Check Organization table in the database.
-      expect(
-        await db.getRepository(OrganizationEntity).findOneBy({ organizationId }),
-      ).toMatchObject({
+      expect(await db.getRepository(Organization).findOneBy({ organizationId })).toMatchObject({
         ...testOrganization,
         organizationId,
       });
 
       // Check OrganizationUser table in the database.
-      expect(
-        await db
-          .getRepository(OrganizationUserEntity)
-          .findOneBy({ user: { userId }, organization: { organizationId } }),
-      ).toMatchObject({
+      expect(await db.getRepository(OrganizationUser).findOneBy({ userId, organizationId })).toMatchObject({
         organizationUserId: expect.any(Number),
         userType: UserType.OWNER,
         inviteAccepted: true,
@@ -143,9 +122,9 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(body).toMatchObject({
         message: [
-          'organizationName must be a string',
-          'organizationDescription must be a string',
-          'organizationType must be one of the following values: Individual, Collaborative',
+          'name must be a string',
+          'description must be a string',
+          'organizationType must be one of the following values: individual, collaborative',
         ],
       });
     });
@@ -170,8 +149,8 @@ describe('E2E - Organizations Endpoints', () => {
 
     it('Organization updated successfully', async () => {
       const updatedOrg = {
-        organizationName: 'Updated Org',
-        organizationDescription: 'Updated Description',
+        name: 'Updated Org',
+        description: 'Updated Description',
         organizationType: OrganizationType.COLLABORATIVE,
       };
 
@@ -182,11 +161,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(200)
         .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
 
-      expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId: testOrganizationId }),
-      ).toMatchObject({
+      expect(await db.getRepository(Organization).findOneBy({ organizationId: testOrganizationId })).toMatchObject({
         ...updatedOrg,
         organizationId: testOrganizationId,
       });
@@ -196,17 +171,13 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .patch(`/organizations/${testOrganizationId}`)
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ organizationName: 'updated organization' })
+        .send({ name: 'updated organization' })
         .expect(200)
         .expect(({ text }) => expect(text).toBe('Organization successfully updated'));
 
-      expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId: testOrganizationId }),
-      ).toMatchObject({
+      expect(await db.getRepository(Organization).findOneBy({ organizationId: testOrganizationId })).toMatchObject({
         ...testOrganization,
-        organizationName: 'updated organization',
+        name: 'updated organization',
       });
     });
 
@@ -226,7 +197,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(400)
         .expect((res) => {
           expect(res.body.message).toContain(
-            'organizationType must be one of the following values: Individual, Collaborative',
+            'organizationType must be one of the following values: individual, collaborative',
           );
         });
     });
@@ -247,15 +218,9 @@ describe('E2E - Organizations Endpoints', () => {
     });
 
     it('Organization deleted successfully', async () => {
+      expect(await db.getRepository(Organization).findOneBy({ organizationId: testOrganizationId })).toBeDefined();
       expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId: testOrganizationId }),
-      ).toBeDefined();
-      expect(
-        await db
-          .getRepository(OrganizationUserEntity)
-          .findOneBy({ organization: { organizationId: testOrganizationId } }),
+        await db.getRepository(OrganizationUser).findOneBy({ organization: { organizationId: testOrganizationId } }),
       ).toBeDefined();
 
       await request(app.getHttpServer())
@@ -264,15 +229,9 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(200)
         .expect(({ text }) => expect(text).toBe('Organization successfully removed'));
 
+      expect(await db.getRepository(Organization).findOneBy({ organizationId: testOrganizationId })).toBeNull();
       expect(
-        await db
-          .getRepository(OrganizationEntity)
-          .findOneBy({ organizationId: testOrganizationId }),
-      ).toBeNull();
-      expect(
-        await db
-          .getRepository(OrganizationUserEntity)
-          .findOneBy({ organization: { organizationId: testOrganizationId } }),
+        await db.getRepository(OrganizationUser).findOneBy({ organization: { organizationId: testOrganizationId } }),
       ).toBeNull();
     });
 
@@ -318,7 +277,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
 
       expect(
-        await db.getRepository(OrganizationUserEntity).find({
+        await db.getRepository(OrganizationUser).find({
           where: {
             organization: { organizationId: testOrganizationId },
           },
@@ -351,7 +310,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
 
       expect(
-        await db.getRepository(OrganizationUserEntity).find({
+        await db.getRepository(OrganizationUser).find({
           where: {
             organization: { organizationId: testOrganizationId },
           },
@@ -385,7 +344,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(({ text }) => expect(text).toBe('User successfully added to organization'));
 
       expect(
-        await db.getRepository(OrganizationUserEntity).find({
+        await db.getRepository(OrganizationUser).find({
           where: {
             organization: { organizationId: testOrganizationId },
           },
@@ -416,9 +375,7 @@ describe('E2E - Organizations Endpoints', () => {
           organizationId: 9999,
         })
         .expect(403)
-        .expect(({ body }) =>
-          expect(body.message).toBe('The request user is not part of this organization'),
-        );
+        .expect(({ body }) => expect(body.message).toBe('The request user is not part of this organization'));
     });
 
     it('User not added - User not found', async () => {
@@ -458,9 +415,7 @@ describe('E2E - Organizations Endpoints', () => {
         .set('Authorization', `Bearer ${authToken2}`)
         .send(newOrgUser)
         .expect(403)
-        .expect(({ body }) =>
-          expect(body.message).toBe('The request user is not part of this organization'),
-        );
+        .expect(({ body }) => expect(body.message).toBe('The request user is not part of this organization'));
     });
 
     it('User not added - The request user is not the owner', async () => {
@@ -480,7 +435,7 @@ describe('E2E - Organizations Endpoints', () => {
         .post(`/organizations/addUser`)
         .set('Authorization', `Bearer ${authToken2}`)
         .send(newOrgUser)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -550,7 +505,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -582,7 +537,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -614,7 +569,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -646,7 +601,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -678,7 +633,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -710,7 +665,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -729,9 +684,7 @@ describe('E2E - Organizations Endpoints', () => {
           userType: UserType.READ,
         })
         .expect(403)
-        .expect(({ body }) =>
-          expect(body.message).toBe('The request user is not part of this organization'),
-        );
+        .expect(({ body }) => expect(body.message).toBe('The request user is not part of this organization'));
     });
 
     it('User permission not changed - User not found', async () => {
@@ -758,9 +711,7 @@ describe('E2E - Organizations Endpoints', () => {
         })
         .expect(400)
         .expect((res) => {
-          expect(res.body.message).toContain(
-            'userType must be one of the following values: owner, write, read',
-          );
+          expect(res.body.message).toContain('userType must be one of the following values: owner, write, read');
         });
     });
 
@@ -788,7 +739,7 @@ describe('E2E - Organizations Endpoints', () => {
           userType: UserType.OWNER,
           inviteAccepted: true,
         })
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toContain('You do not have permission to change inviteAccepted');
         });
@@ -817,9 +768,7 @@ describe('E2E - Organizations Endpoints', () => {
           userType: UserType.WRITE,
         })
         .expect(403)
-        .expect(({ body }) =>
-          expect(body.message).toBe('The request user is not part of this organization'),
-        );
+        .expect(({ body }) => expect(body.message).toBe('The request user is not part of this organization'));
     });
 
     it('User permission not changed - The request user is not the owner', async () => {
@@ -842,7 +791,7 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUser,
           userType: UserType.WRITE,
         })
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
   });
@@ -883,7 +832,7 @@ describe('E2E - Organizations Endpoints', () => {
       // Check before updating
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -907,7 +856,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(
         await db
-          .getRepository(OrganizationUserEntity)
+          .getRepository(OrganizationUser)
           .findOneBy({
             organizationId: testOrganizationId,
             userId: userId2,
@@ -949,7 +898,7 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUserInvite,
           userId: 99999,
         })
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -989,7 +938,7 @@ describe('E2E - Organizations Endpoints', () => {
           ...newOrgUserInvite,
           userType: UserType.OWNER,
         })
-        .expect(401)
+        .expect(403)
         .expect((res) => {
           expect(res.body.message).toContain('You do not have permission to change userType');
         });
@@ -1014,7 +963,7 @@ describe('E2E - Organizations Endpoints', () => {
         .patch(`/organizations/updateUser/invite`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(newOrgUserInvite)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
   });
@@ -1044,7 +993,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(201);
 
       await db
-        .getRepository(OrganizationUserEntity)
+        .getRepository(OrganizationUser)
         .findOneBy({
           organizationId: testOrganizationId,
           userId: userId2,
@@ -1066,7 +1015,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(({ text }) => expect(text).toBe('User successfully removed from organization'));
 
       expect(
-        await db.getRepository(OrganizationUserEntity).findOneBy({
+        await db.getRepository(OrganizationUser).findOneBy({
           organizationId: testOrganizationId,
           userId: userId2,
         }),
@@ -1081,7 +1030,7 @@ describe('E2E - Organizations Endpoints', () => {
         .expect(({ text }) => expect(text).toBe('User successfully removed from organization'));
 
       expect(
-        await db.getRepository(OrganizationUserEntity).findOneBy({
+        await db.getRepository(OrganizationUser).findOneBy({
           organizationId: testOrganizationId,
           userId: userId2,
         }),
@@ -1104,7 +1053,7 @@ describe('E2E - Organizations Endpoints', () => {
 
       // Check if the user was added
       await db
-        .getRepository(OrganizationUserEntity)
+        .getRepository(OrganizationUser)
         .findOneBy({
           organizationId: testOrganizationId,
           userId: userId3,
@@ -1115,7 +1064,7 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .delete(`/organizations/removeUser/${testOrganizationId}/${userId2}`)
         .set('Authorization', `Bearer ${authToken3}`)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -1124,7 +1073,7 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .delete(`/organizations/removeUser/${testOrganizationId}/${userId2}`)
         .set('Authorization', `Bearer ${authToken3}`)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -1140,7 +1089,7 @@ describe('E2E - Organizations Endpoints', () => {
       await request(app.getHttpServer())
         .delete(`/organizations/removeUser/99999/${userId2}`)
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(401)
+        .expect(403)
         .expect(({ body }) => expect(body.message).toBe('You do not have permission to do this'));
     });
 
@@ -1149,9 +1098,7 @@ describe('E2E - Organizations Endpoints', () => {
         .delete(`/organizations/removeUser/${testOrganizationId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404)
-        .expect(({ body }) =>
-          expect(body.message).toBe('Cannot DELETE /organizations/removeUser/1'),
-        );
+        .expect(({ body }) => expect(body.message).toBe('Cannot DELETE /organizations/removeUser/1'));
     });
 
     it('User not removed - Missing organization and user param', async () => {
@@ -1201,17 +1148,15 @@ describe('E2E - Organizations Endpoints', () => {
       expect(body).toHaveLength(6);
 
       body.forEach((organization) => {
-        expect([OrganizationType.INDIVIDUAL, OrganizationType.COLLABORATIVE]).toContain(
-          organization.organizationType,
-        );
+        expect([OrganizationType.INDIVIDUAL, OrganizationType.COLLABORATIVE]).toContain(organization.organizationType);
 
         expect(allOrgIds).toContain(organization.organizationId);
 
         expect(organization).toStrictEqual({
           organizationId: expect.any(Number),
           organizationType: expect.any(String),
-          organizationName: testOrganization.organizationName,
-          organizationDescription: testOrganization.organizationDescription,
+          name: testOrganization.name,
+          description: testOrganization.description,
         });
       });
     });
@@ -1270,9 +1215,9 @@ describe('E2E - Organizations Endpoints', () => {
 
       expect(orgData).toStrictEqual({
         organizationId: 1,
-        organizationName: 'Test Org',
-        organizationDescription: 'Test Description',
-        organizationType: 'Collaborative',
+        name: 'Test Org',
+        description: 'Test Description',
+        organizationType: 'collaborative',
         organizationUsers: [
           {
             user: 'john_doe',
@@ -1318,9 +1263,7 @@ describe('E2E - Organizations Endpoints', () => {
         .get('/organizations/data/99999')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(403)
-        .expect(({ body }) =>
-          expect(body.message).toBe('The request user is not part of this organization'),
-        );
+        .expect(({ body }) => expect(body.message).toBe('The request user is not part of this organization'));
     });
   });
 });

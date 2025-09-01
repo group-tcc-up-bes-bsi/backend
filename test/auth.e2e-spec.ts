@@ -3,7 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
+import { User } from 'src/users/entities/user.entity';
+import { flushDatabase } from './helpers/database-utils';
 
 describe('E2E - Auth Endpoints', () => {
   let app: INestApplication;
@@ -18,10 +19,9 @@ describe('E2E - Auth Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(UserEntity).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
-    await db.getRepository(UserEntity).save({
+    await flushDatabase(db);
+
+    await db.getRepository(User).save({
       username: 'john_doe',
       password: '123',
     });

@@ -3,20 +3,49 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app/app.module';
 import { DataSource } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
-import { DocumentEntity } from 'src/documents/entities/document.entity';
+import { Document } from 'src/documents/entities/document.entity';
+import { flushDatabase, flushDatabaseTable, saveTestUser } from './helpers/database-utils';
+import * as epUtils from './helpers/endpoint-utils';
+import { OrganizationType } from 'src/organizations/entities/organization.entity';
+
+//////////////////////////////////////////////////////////////////////
+// Test entity objects
+///////////////////////////////////////////////////////////////////////
+
+const testUser = {
+  username: 'john_doe',
+  password: '123',
+};
+
+const testUser2 = {
+  username: 'jane_doe',
+  password: '123',
+};
+
+const testOrganization = {
+  name: 'Test Org',
+  description: 'Test Description',
+  organizationType: OrganizationType.COLLABORATIVE,
+};
+
+const testDocument = {
+  name: 'test document',
+  type: 'PDF',
+  description: 'some test document',
+  organizationId: null,
+};
+
+//////////////////////////////////////////////////////////////////////
+// Testcases
+///////////////////////////////////////////////////////////////////////
 
 describe('E2E - Documents Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
+  let organizationId: number;
   let authToken: string;
-  let userId: number;
-
-  const testDocument = {
-    documentName: 'test document',
-    documentType: 'PDF',
-    documentDescription: 'some test document',
-  };
+  let authToken2: string;
+  let userId2: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -27,28 +56,19 @@ describe('E2E - Documents Endpoints', () => {
     await app.init();
 
     db = app.get(DataSource);
+    await flushDatabase(db);
 
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(UserEntity).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await saveTestUser(db, testUser);
+    authToken = await epUtils.makeTestLogin(app, testUser);
+    organizationId = await epUtils.createTestOrganization(app, authToken, testOrganization);
+    testDocument.organizationId = organizationId;
 
-    const user = await db.getRepository(UserEntity).save({
-      username: 'john_doe',
-      password: '123',
-    });
-    userId = user.userId;
-
-    authToken = (
-      await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ username: 'john_doe', password: '123' })
-    ).body.token;
+    userId2 = await saveTestUser(db, testUser2);
+    authToken2 = await epUtils.makeTestLogin(app, testUser2);
   });
 
   beforeEach(async () => {
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.getRepository(DocumentEntity).clear();
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    await flushDatabaseTable(db, [Document]);
   });
 
   afterAll(async () => {
@@ -73,17 +93,16 @@ describe('E2E - Documents Endpoints', () => {
       });
 
       expect(
-        await db.getRepository(DocumentEntity).findOneBy({ documentId: body.documentId }),
+        await db.getRepository(Document).findOne({
+          where: { documentId: body.documentId },
+          relations: ['organization'],
+        }),
       ).toMatchObject({
         ...testDocument,
         documentId: body.documentId,
-        documentCreationDate: expect.any(Date),
-        documentLastModifiedDate: expect.any(Date),
-        owner: {
-          userId,
-          username: 'john_doe',
-          password: '123',
-        },
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+        organization: testOrganization,
       });
     });
 
@@ -95,20 +114,21 @@ describe('E2E - Documents Endpoints', () => {
 
       expect(body).toMatchObject({
         message: [
-          'documentName must be a string',
-          'documentType must be a string',
-          'documentDescription must be a string',
+          'name must be a string',
+          'type must be a string',
+          'description must be a string',
+          'organizationId must be a number conforming to the specified constraints',
         ],
       });
     });
   });
 
-  describe('Read - Get all', () => {
+  describe('Read - Get all organization documents', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer()).get('/documents').expect(401);
+      return request(app.getHttpServer()).get(`/documents/organization/${organizationId}`).expect(401);
     });
 
-    it('Get all documents', async () => {
+    it('Get all documents from organization', async () => {
       for (let i = 0; i < 3; i++) {
         await request(app.getHttpServer())
           .post('/documents')
@@ -118,7 +138,7 @@ describe('E2E - Documents Endpoints', () => {
       }
 
       await request(app.getHttpServer())
-        .get('/documents')
+        .get(`/documents/organization/${organizationId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect(({ body }) => {
@@ -126,26 +146,165 @@ describe('E2E - Documents Endpoints', () => {
             expect(document).toMatchObject({
               ...testDocument,
               documentId: expect.any(Number),
-              documentCreationDate: expect.any(String),
-              documentLastModifiedDate: expect.any(String),
-              owner: userId,
+              creationDate: expect.any(String),
+              lastModifiedDate: expect.any(String),
             });
           });
           expect(body).toHaveLength(3);
+        });
+    });
+
+    it('Get all documents from organization - other user with owner permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'OWNER',
+      });
+
+      for (let i = 0; i < 3; i++) {
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201);
+      }
+
+      await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          body.forEach((document) => {
+            expect(document).toMatchObject({
+              ...testDocument,
+              documentId: expect.any(Number),
+              creationDate: expect.any(String),
+              lastModifiedDate: expect.any(String),
+            });
+          });
+          expect(body).toHaveLength(3);
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get all documents from organization - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      for (let i = 0; i < 3; i++) {
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201);
+      }
+
+      await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          body.forEach((document) => {
+            expect(document).toMatchObject({
+              ...testDocument,
+              documentId: expect.any(Number),
+              creationDate: expect.any(String),
+              lastModifiedDate: expect.any(String),
+            });
+          });
+          expect(body).toHaveLength(3);
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get all documents from organization - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      for (let i = 0; i < 3; i++) {
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201);
+      }
+
+      await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          body.forEach((document) => {
+            expect(document).toMatchObject({
+              ...testDocument,
+              documentId: expect.any(Number),
+              creationDate: expect.any(String),
+              lastModifiedDate: expect.any(String),
+            });
+          });
+          expect(body).toHaveLength(3);
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get all documents from organization - user is not part of the organization', async () => {
+      for (let i = 0; i < 3; i++) {
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201);
+      }
+
+      await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You are not part of the organization',
+            statusCode: 403,
+          });
+        });
+    });
+
+    it('Organization not found', () => {
+      return request(app.getHttpServer())
+        .get('/documents/organization/999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You are not part of the organization',
+            statusCode: 403,
+          });
         });
     });
   });
 
   describe('Read - Get one', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer()).get('/documents/1').expect(401);
-    });
-
-    it('Document not found', () => {
-      return request(app.getHttpServer())
-        .get('/documents/999')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(404);
+      return request(app.getHttpServer()).get('/documents/id/1').expect(401);
     });
 
     it('Get document by ID', async () => {
@@ -158,22 +317,131 @@ describe('E2E - Documents Endpoints', () => {
       const documentId = body.documentId;
 
       await request(app.getHttpServer())
-        .get(`/documents/${documentId}`)
+        .get(`/documents/id/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect(({ body }) => {
           expect(body).toMatchObject({
             ...testDocument,
             documentId,
-            documentCreationDate: expect.any(String),
-            documentLastModifiedDate: expect.any(String),
-            owner: userId,
+            creationDate: expect.any(String),
+            lastModifiedDate: expect.any(String),
+          });
+        });
+    });
+
+    it('Get document by ID - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .get(`/documents/id/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            ...testDocument,
+            documentId,
+            creationDate: expect.any(String),
+            lastModifiedDate: expect.any(String),
+          });
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get document by ID - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .get(`/documents/id/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            ...testDocument,
+            documentId,
+            creationDate: expect.any(String),
+            lastModifiedDate: expect.any(String),
+          });
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get document by ID - user is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .get(`/documents/id/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You are not part of the organization',
+            statusCode: 403,
+          });
+        });
+    });
+
+    it('Document not found', () => {
+      return request(app.getHttpServer())
+        .get('/documents/id/999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Not Found',
+            message: 'Document not found',
+            statusCode: 404,
           });
         });
     });
   });
 
   describe('Update', () => {
+    const newDocument = {
+      name: 'My Document',
+      type: 'DOCX',
+      description: 'My MS Word document',
+    };
+
     it('Request without authentication', () => {
       return request(app.getHttpServer()).patch('/documents/1').send(testDocument).expect(401);
     });
@@ -187,24 +455,23 @@ describe('E2E - Documents Endpoints', () => {
           .expect(201)
       ).body.documentId;
 
-      const newDocument = {
-        documentName: 'My Document',
-        documentType: 'DOCX',
-        documentDescription: 'My MS Word document',
-      };
-
       await request(app.getHttpServer())
         .patch(`/documents/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(newDocument)
         .expect(200)
-        .expect(({ text }) => expect(text).toBe('Document successfully updated'));
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully updated',
+            documentId,
+          }),
+        );
 
-      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
         ...newDocument,
         documentId,
-        documentCreationDate: expect.any(Date),
-        documentLastModifiedDate: expect.any(Date),
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
       });
     });
 
@@ -220,16 +487,168 @@ describe('E2E - Documents Endpoints', () => {
       await request(app.getHttpServer())
         .patch(`/documents/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ documentName: 'updated document' })
+        .send({ name: 'updated document' })
         .expect(200)
-        .expect(({ text }) => expect(text).toBe('Document successfully updated'));
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully updated',
+            documentId,
+          }),
+        );
 
-      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toMatchObject({
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
         ...testDocument,
-        documentName: 'updated document',
+        name: 'updated document',
         documentId,
-        documentCreationDate: expect.any(Date),
-        documentLastModifiedDate: expect.any(Date),
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+      });
+    });
+
+    it('Document updated successfully - other user with owner permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'OWNER',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send(newDocument)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully updated',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...newDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document updated successfully - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send(newDocument)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully updated',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...newDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not updated - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send(newDocument)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...testDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not updated - user is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send(newDocument)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...testDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
       });
     });
 
@@ -237,7 +656,7 @@ describe('E2E - Documents Endpoints', () => {
       return request(app.getHttpServer())
         .patch('/documents/999')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocument)
+        .send(newDocument)
         .expect(404);
     });
   });
@@ -260,9 +679,134 @@ describe('E2E - Documents Endpoints', () => {
         .delete(`/documents/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
-        .expect(({ text }) => expect(text).toBe('Document successfully removed'));
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully removed',
+            documentId,
+          }),
+        );
 
-      expect(await db.getRepository(DocumentEntity).findOneBy({ documentId })).toBeNull();
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+    });
+
+    it('Document deleted successfully - other user with owner permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'OWNER',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .delete(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully removed',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not deleted - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .delete(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have owner permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeDefined();
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not deleted - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .delete(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have owner permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeDefined();
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not deleted - user is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .delete(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have owner permissions in this organization',
+          }),
+        );
     });
 
     it('Document not found', () => {

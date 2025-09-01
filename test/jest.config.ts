@@ -10,14 +10,16 @@ const config: Config = {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/**/*.spec.ts'],
   coverageDirectory: './coverage',
   testRegex: '.e2e-spec.ts$',
   moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths ?? {}, {
-    prefix: '<rootDir>/../',
+    prefix: '<rootDir>',
   }),
-  globalSetup: './jest-global-setup.ts',
-  globalTeardown: './jest-global-teardown.ts',
+  rootDir: '../',
+  globalSetup: './test/jest-global-setup.ts',
+  globalTeardown: './test/jest-global-teardown.ts',
   reporters: [
     'default',
     [

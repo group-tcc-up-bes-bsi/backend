@@ -1,30 +1,40 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { UserEntity } from 'src/users/entities/user.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Organization } from 'src/organizations/entities/organization.entity';
+import { DocumentVersion } from 'src/document-versions/entities/document-version.entity';
 
 /**
- * Represents a document entity in the database.
+ * Document entity.
  */
 @Entity('documents')
-export class DocumentEntity {
+export class Document {
   @PrimaryGeneratedColumn()
   documentId: number;
 
   @Column()
-  documentName: string;
+  name: string;
 
   @Column()
-  documentType: string;
+  type: string;
 
   @Column()
-  documentDescription: string;
+  description: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  documentCreationDate: Date;
+  creationDate: Date;
 
+  // Should be updated when a new version is added
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  documentLastModifiedDate: Date;
+  lastModifiedDate: Date;
 
-  @ManyToOne(() => UserEntity, (user) => user.documents, { eager: true }) // eager: user entity will be loaded with the document
-  @JoinColumn({ name: 'userId' }) // Foreign key column in the documents table
-  owner: UserEntity;
+  /* ------------- This document versions ------------- */
+  @OneToMany(() => DocumentVersion, (version) => version.document)
+  documentVersions: DocumentVersion[];
+
+  /* ------------- From which organization is this document ------------- */
+  @ManyToOne(() => Organization, (organization) => organization.documents)
+  @JoinColumn({ name: 'organizationId' })
+  organization: Organization;
+
+  @Column()
+  organizationId: number;
 }

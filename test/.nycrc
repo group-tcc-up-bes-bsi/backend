@@ -1,0 +1,8 @@
+{
+  "all": true,
+  "reporter": ["text", "html"],
+  "include": ["../src/**/*.ts"],
+  "exclude": ["test/**/*e2e-spec.ts"],
+  "extension": [".ts"],
+  "check-coverage": false
+}
