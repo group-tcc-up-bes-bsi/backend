@@ -17,6 +17,7 @@ import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserPasswordDto } from './dto/update-user-password';
 
 /**
  * Controller for managing users.
@@ -31,18 +32,6 @@ export class UsersController {
    * @param {UsersService} usersService - The service responsible for user operations.
    */
   constructor(private readonly usersService: UsersService) {}
-
-  /**
-   * Retrieves all users.
-   * //FIXME: Only administrators should be able to access this endpoint
-   * @returns {Promise<[]>} - A promise that resolves to an array of users.
-   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
-   */
-  @UseGuards(AuthGuard)
-  @Get()
-  findAll() {
-    return this.usersService.findAll();
-  }
 
   /**
    * Retrieves a user by their ID.
@@ -60,6 +49,17 @@ export class UsersController {
   }
 
   /**
+   * Retrieves a user by their username.
+   * @param {string} username - The username of the user to retrieve.
+   * @returns {Promise<User>} - A promise that resolves to the user object.
+   */
+  @Get('by-username/:username')
+  async findByUsername(@Param('username') username: string) {
+    const user = await this.usersService.findByUsername(username);
+    return user;
+  }
+
+  /**
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
    * @returns {Promise<{}>} - A promise that resolves to the created user object.
@@ -68,6 +68,19 @@ export class UsersController {
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
+  }
+
+  /**
+   * Updates the password of an existing user.
+   * Only the user themselves or an admin can access this endpoint.
+   * @param {string} id - The ID of the user to update.
+   * @param {UpdateUserPasswordDto} dto - The body containing the dto and adminPass.
+   * @returns {Promise<{}>} - A promise that resolves to the updated user object.
+   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   */
+  @Patch('update-password/:id')
+  updatePassword(@Param('id') id: string, @Body() dto: UpdateUserPasswordDto) {
+    return this.usersService.updatePassword(+id, dto);
   }
 
   /**

@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 
-type AuthInput = { email: string; password: string };
-type AuthOutput = { token: string; user: { userId: number; email: string } };
+type AuthInput = { username: string; password: string };
+type AuthOutput = { token: string; user: { userId: number; username: string } };
 
 /**
  * Service responsible for handling authentication-related logic.
@@ -27,22 +27,22 @@ export class AuthService {
   /**
    * Handles user login by validating credentials and generating a JWT token.
    * @param {AuthInput} input - The login credentials.
-   * @param {string} input.email - The user's email address.
+   * @param {string} input.username - The user's username address.
    * @param {string} input.password - The user's password.
    * @returns {Promise<AuthOutput>} The authentication token and user information.
-   * @throws {BadRequestException} If email or password is missing.
-   * @throws {UnauthorizedException} If the email or password is invalid.
+   * @throws {BadRequestException} If username or password is missing.
+   * @throws {UnauthorizedException} If the username or password is invalid.
    */
   async login(input: AuthInput): Promise<AuthOutput> {
     // Sanity check
-    if (!input.email || !input.password) {
-      throw new BadRequestException('email and password are required');
+    if (!input.username || !input.password) {
+      throw new BadRequestException('username and password are required');
     }
 
-    const user = await this.usersService.findByEmail(input.email);
+    const user = await this.usersService.findByUsername(input.username);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email');
+      throw new UnauthorizedException('Invalid username');
     }
 
     if (user.password === input.password) {
@@ -59,7 +59,7 @@ export class AuthService {
   private async signIn(user): Promise<AuthOutput> {
     const tokenPayload = {
       sub: user.userId,
-      email: user.email,
+      username: user.username,
     };
     const accessToken = await this.jwtService.signAsync(tokenPayload);
 
@@ -67,7 +67,7 @@ export class AuthService {
       token: accessToken,
       user: {
         userId: user.userId,
-        email: user.email,
+        username: user.username,
       },
     };
   }

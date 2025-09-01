@@ -1,9 +1,18 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ConfigService } from '@nestjs/config';
+import { UpdateUserPasswordDto } from './dto/update-user-password';
 
 /**
  * Service for managing users.
@@ -12,15 +21,20 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+  adminPassword: string;
 
   /**
    * Creates an instance of UsersService.
    * @param {Repository<User>} usersRepo - The repository for user entities.
+   * @param {ConfigService} configService - The configuration service to access environment variables.
    */
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.adminPassword = configService.get('ADMINPASS');
+  }
 
   /**
    * Finds a user by their username.
@@ -31,18 +45,10 @@ export class UsersService {
     const user = await this.usersRepo.findOne({
       where: { username },
     });
-    return user;
-  }
-
-  /**
-   * Finds a user by their email.
-   * @param {string} email - The email of the user to find.
-   * @returns {Promise<User | undefined>} - A promise that resolves to the user object if found, or undefined if not found.
-   */
-  async findByEmail(email: string): Promise<User | undefined> {
-    const user = await this.usersRepo.findOne({
-      where: { email },
-    });
+    if (user == null) {
+      this.logger.warn(`User with username ${username} not found`);
+      throw new NotFoundException('User not found');
+    }
     return user;
   }
 
@@ -72,32 +78,33 @@ export class UsersService {
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
    * @returns {Promise<User>} - A promise that resolves to the created user entity.
-   * @throws {ConflictException} - If a user with the same username or email already exists.
+   * @throws {ConflictException} - If a user with the same username already exists.
    */
   async create(dto: CreateUserDto): Promise<User> {
-    const user = this.usersRepo.create(dto);
-    try {
-      const savedUser = await this.usersRepo.save(user);
-      this.logger.log(`User ${savedUser.username} successfully created with ID ${savedUser.userId}`);
-      return savedUser;
-    } catch (e) {
-      if (e.sqlMessage.includes('Duplicate entry')) {
-        this.logger.warn(`User with username ${dto.username} already exists`);
-        throw new ConflictException('User already exists');
-      }
-      this.logger.error('Error creating user', e.stack);
-      throw new Error('Error creating user');
-    }
+    return this.usersRepo
+      .save(this.usersRepo.create(dto))
+      .then((savedUser) => {
+        this.logger.log(`User ${savedUser.username} successfully created with ID ${savedUser.userId}`);
+        return savedUser;
+      })
+      .catch((e) => {
+        if (e.sqlMessage.includes('Duplicate entry')) {
+          this.logger.warn(`User with username ${dto.username} already exists`);
+          throw new ConflictException('User already exists');
+        }
+        this.logger.error('Error creating user', e.stack);
+        throw new Error('Error creating user');
+      });
   }
 
   /**
    * Updates an existing user.
    * @param {number} userId - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
-   * @returns {Promise<User>} - A promise that resolves to the updated user entity.
+   * @returns {Promise<any>} - A promise that is resolved when the operation is completed.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
-   * @throws {ConflictException} - If a user with the same username or email already exists.
+   * @throws {ConflictException} - If a user with the same username already exists.
    */
   async update(userId: number, dto: UpdateUserDto) {
     if (Object.keys(dto).length === 0) {
@@ -105,60 +112,116 @@ export class UsersService {
       throw new BadRequestException('No data provided for update');
     }
 
-    try {
-      const result = await this.usersRepo.update(userId, dto);
-      if (result.affected > 0) {
-        this.logger.log(`User with ID ${userId} successfully updated`);
-        const updatedUser = await this.findOne(userId);
-        return {
-          userId: updatedUser.userId,
-          username: updatedUser.username,
-          email: updatedUser.email,
-        };
-      } else {
-        this.logger.warn(`No user found with ID ${userId} to update`);
-        throw new NotFoundException('User not found');
-      }
-    } catch (e) {
-      if (e.name === 'NotFoundException') {
-        throw e;
-      }
-
-      if (e.sqlMessage.includes('Duplicate entry')) {
-        if (e.query.includes('username')) {
-          this.logger.warn(`User with username ${dto.username} already exists`);
-          throw new ConflictException('User already exists');
-        } else if (e.query.includes('email')) {
-          this.logger.warn(`User with email ${dto.email} already exists`);
-          throw new ConflictException('Email already exists');
+    return this.usersRepo
+      .update(userId, dto)
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`User with ID ${userId} successfully updated`);
+          return {
+            message: 'User successfully updated',
+            userId,
+          };
         } else {
-          this.logger.error(`Unexpected error: ${e.message}`);
-          throw new Error('Unexpected error');
+          this.logger.warn(`No user found with ID ${userId} to update`);
+          throw new NotFoundException('User not found');
         }
-      }
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
 
-      this.logger.error(`Error updating user with ID ${userId}`, e.stack);
-      throw new Error('Error updating user');
+        if (e.sqlMessage.includes('Duplicate entry')) {
+          if (e.query.includes('username')) {
+            this.logger.warn(`User with username ${dto.username} already exists`);
+            throw new ConflictException('User already exists');
+          } else {
+            this.logger.error(`Unexpected error: ${e.message}`);
+            throw new Error('Unexpected error');
+          }
+        }
+
+        this.logger.error(`Error updating user with ID ${userId}`, e.stack);
+        throw new Error('Error updating user');
+      });
+  }
+
+  /**
+   * Updates an existing user.
+   * @param {number} userId - The ID of the user to update.
+   * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
+   * @param {string} adminPass - The new password for the user.
+   * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
+   * @throws {BadRequestException} - If no data is provided for update.
+   * @throws {NotFoundException} - If the user with the specified ID does not exist.
+   * @throws {ConflictException} - If a user with the same username already exists.
+   */
+  async updatePassword(userId: number, dto: UpdateUserPasswordDto) {
+    const { adminPass, password } = dto;
+    if (!adminPass) {
+      this.logger.warn(`No AdminPass provided for update userId ${userId}`);
+      throw new BadRequestException('No AdminPass provided for update');
     }
+
+    if (adminPass !== this.adminPassword) {
+      this.logger.warn(`AdminPass is incorrect for update userId ${userId}`);
+      throw new ForbiddenException('Invalid AdminPass');
+    }
+
+    const user = await this.findOne(userId);
+    if (!user) {
+      this.logger.warn(`User with ID ${userId} not found for password update`);
+      throw new NotFoundException('User not found');
+    }
+
+    return this.usersRepo
+      .update(userId, {
+        ...user,
+        password,
+      })
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`User with ID ${userId} password successfully updated`);
+          return {
+            message: 'User password successfully updated',
+            userId,
+          };
+        } else {
+          this.logger.warn(`No user found with ID ${userId} to update`);
+          throw new NotFoundException('User not found');
+        }
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error updating user with ID ${userId}`, e.stack);
+        throw new Error('Error updating user');
+      });
   }
 
   /**
    * Removes a user by their ID.
    * @param {number} userId - The ID of the user to remove.
-   * @returns {Promise<User>} - A promise that resolves to the removed user entity.
+   * @returns {Promise<any>} - A promise that resolves when the operation is completed.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
    */
   async remove(userId: number) {
     const user = await this.findOne(userId);
     if (user) {
-      try {
-        await this.usersRepo.remove(user);
-        this.logger.log(`User with ID ${userId} successfully removed`);
-        return user;
-      } catch (e) {
-        this.logger.error(`Error removing user with ID ${userId}`, e.stack);
-        throw new Error('Error deleting user');
-      }
+      return this.usersRepo
+        .remove(user)
+        .then(() => {
+          this.logger.log(`User with ID ${userId} successfully removed`);
+          return {
+            message: 'User successfully deleted',
+            userId,
+          };
+        })
+        .catch((e) => {
+          this.logger.error(`Error removing user with ID ${userId}`, e.stack);
+          throw new Error('Error deleting user');
+        });
     } else {
       this.logger.warn(`User with ID ${userId} not found for removal`);
       throw new NotFoundException('User not found');

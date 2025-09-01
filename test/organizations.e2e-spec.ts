@@ -15,19 +15,16 @@ import { makeTestLogin } from './helpers/endpoint-utils';
 const testUser = {
   username: 'john_doe',
   password: '123',
-  email: 'test@example.com',
 };
 
 const testUser2 = {
   username: 'new_john',
   password: '1234',
-  email: 'newTest@example.com',
 };
 
 const testUser3 = {
   username: 'jane_doe',
   password: '123',
-  email: 'jane@example.com',
 };
 
 const testOrganization = {

@@ -15,13 +15,11 @@ import { OrganizationType } from 'src/organizations/entities/organization.entity
 const testUser = {
   username: 'john_doe',
   password: '123',
-  email: 'test@example.com',
 };
 
 const testUser2 = {
   username: 'jane_doe',
   password: '123',
-  email: 'jane@example.com',
 };
 
 const testOrganization = {
