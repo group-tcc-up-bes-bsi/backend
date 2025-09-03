@@ -48,9 +48,9 @@ describe('E2E - Auth Endpoints', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
         .send({ username: 'random', password: 'invalid' })
-        .expect(404)
+        .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('User not found');
+          expect(res.body.message).toBe('Invalid username');
         });
     });
 

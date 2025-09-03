@@ -39,7 +39,7 @@ export class AuthService {
       throw new BadRequestException('username and password are required');
     }
 
-    const user = await this.usersService.findByUsername(input.username);
+    const user = await this.usersService.findAuthUser(input.username);
 
     if (!user) {
       throw new UnauthorizedException('Invalid username');

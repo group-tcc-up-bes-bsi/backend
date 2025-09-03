@@ -62,7 +62,7 @@ describe('E2E - Users Endpoints', () => {
         .expect((res) => {
           expect(res.body).toMatchObject({
             userId: expect.any(Number),
-            username: testUser2.username,
+            message: 'User created successfully',
           });
         })
         .expect((res) => {
@@ -157,12 +157,12 @@ describe('E2E - Users Endpoints', () => {
 
   describe('Read - Get by Id', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer()).get(`/users/${userId}`).expect(401);
+      return request(app.getHttpServer()).get(`/users/by-id/${userId}`).expect(401);
     });
 
     it('Get user by ID successfully', () => {
       return request(app.getHttpServer())
-        .get(`/users/${userId}`)
+        .get(`/users/by-id/${userId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
@@ -176,7 +176,7 @@ describe('E2E - Users Endpoints', () => {
 
     it('Trying to access another user', () => {
       return request(app.getHttpServer())
-        .get('/users/99999')
+        .get('/users/by-id/99999')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(403)
         .expect((res) => {
@@ -186,28 +186,32 @@ describe('E2E - Users Endpoints', () => {
   });
 
   describe('Read - Get by Username', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).get(`/users/by-username`).expect(401);
+    });
+
     it('Get user by username successfully', () => {
       return request(app.getHttpServer())
-        .get('/users/by-username/john_doe')
+        .get(`/users/by-username?username=${encodeURIComponent('john_doe')}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
           expect(res.body).toEqual({
             userId: userId,
             username: 'john_doe',
-            password: '123',
-            createdAt: expect.any(String),
           });
         });
     });
 
     it('Get user by username - not found', () => {
       return request(app.getHttpServer())
-        .get('/users/by-username/nonexistent_user')
+        .get(`/users/by-username?username=${encodeURIComponent('nonexistent_user')}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(404)
         .expect((res) => {
           expect(res.body).toEqual({
             statusCode: 404,
-            message: 'User not found',
+            message: 'User with this username not found',
             error: 'Not Found',
           });
         });
@@ -317,6 +321,14 @@ describe('E2E - Users Endpoints', () => {
         });
     });
   });
+
+  /*
+  describe('Update Password', () => {
+    it('User password changed successfully', () => {
+
+    });
+  });
+  */
 
   describe('Delete', () => {
     it('Request without authentication', () => {

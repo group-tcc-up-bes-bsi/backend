@@ -5,6 +5,9 @@ import { IsString } from 'class-validator';
  */
 export class UpdateUserPasswordDto {
   @IsString()
+  username: string;
+
+  @IsString()
   password?: string;
 
   @IsString()
