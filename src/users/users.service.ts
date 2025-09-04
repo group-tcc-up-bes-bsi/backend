@@ -37,27 +37,32 @@ export class UsersService {
   }
 
   /**
-   * Finds a user by their username.
+   * Finds a user by their username for authentication purposes.
    * @param {string} username - The username of the user to find.
    * @returns {Promise<User | undefined>} - A promise that resolves to the user object if found, or undefined if not found.
    */
-  async findByUsername(username: string): Promise<User | undefined> {
-    const user = await this.usersRepo.findOne({
+  findAuthUser(username: string): Promise<User | undefined> {
+    return this.usersRepo.findOne({
       where: { username },
     });
-    if (user == null) {
-      this.logger.warn(`User with username ${username} not found`);
-      throw new NotFoundException('User not found');
-    }
-    return user;
   }
 
   /**
-   * Retrieves all users.
-   * @returns {Promise<User[]>} - A promise that resolves to an array of user entities.
+   * Finds a user by their username.
+   * @param {string} username - The username of the user to find.
+   * @returns {Promise<object>} - A promise that resolves to the user object if found, or undefined if not found.
    */
-  findAll() {
-    return this.usersRepo.find();
+  async findByUsername(username: string): Promise<object> {
+    const user = await this.usersRepo.findOne({
+      where: { username },
+    });
+    if (!user) {
+      throw new NotFoundException('User with this username not found');
+    }
+    return {
+      userId: user.userId,
+      username: user.username,
+    };
   }
 
   /**
@@ -77,15 +82,18 @@ export class UsersService {
   /**
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
-   * @returns {Promise<User>} - A promise that resolves to the created user entity.
+   * @returns {Promise<object>} - A promise that is resolved when the user is created.
    * @throws {ConflictException} - If a user with the same username already exists.
    */
-  async create(dto: CreateUserDto): Promise<User> {
+  async create(dto: CreateUserDto): Promise<object> {
     return this.usersRepo
       .save(this.usersRepo.create(dto))
       .then((savedUser) => {
         this.logger.log(`User ${savedUser.username} successfully created with ID ${savedUser.userId}`);
-        return savedUser;
+        return {
+          userId: savedUser.userId,
+          message: 'User created successfully',
+        };
       })
       .catch((e) => {
         if (e.sqlMessage.includes('Duplicate entry')) {
@@ -148,31 +156,31 @@ export class UsersService {
 
   /**
    * Updates an existing user.
-   * @param {number} userId - The ID of the user to update.
    * @param {UpdateUserDto} dto - The data transfer object containing updated user information.
-   * @param {string} adminPass - The new password for the user.
-   * @returns {Promise<UserEntity>} - A promise that resolves to the updated user entity.
+   * @returns {Promise<object>} - A promise that resolves to the updated user entity.
    * @throws {BadRequestException} - If no data is provided for update.
    * @throws {NotFoundException} - If the user with the specified ID does not exist.
    * @throws {ConflictException} - If a user with the same username already exists.
    */
-  async updatePassword(userId: number, dto: UpdateUserPasswordDto) {
-    const { adminPass, password } = dto;
+  async updatePassword(dto: UpdateUserPasswordDto) {
+    const { adminPass, username, password } = dto;
     if (!adminPass) {
-      this.logger.warn(`No AdminPass provided for update userId ${userId}`);
+      this.logger.warn(`No AdminPass provided for update userId ${username}`);
       throw new BadRequestException('No AdminPass provided for update');
     }
 
     if (adminPass !== this.adminPassword) {
-      this.logger.warn(`AdminPass is incorrect for update userId ${userId}`);
+      this.logger.warn(`AdminPass is incorrect for update user ${username}`);
       throw new ForbiddenException('Invalid AdminPass');
     }
 
-    const user = await this.findOne(userId);
+    const user = await this.findAuthUser(username);
     if (!user) {
-      this.logger.warn(`User with ID ${userId} not found for password update`);
+      this.logger.warn(`User with ID ${username} not found for password update`);
       throw new NotFoundException('User not found');
     }
+
+    const { userId } = user;
 
     return this.usersRepo
       .update(userId, {

@@ -12,6 +12,7 @@ import {
   Request,
   Logger,
   Patch,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/guards/auth.guards';
@@ -42,7 +43,7 @@ export class UsersController {
    * @throws {ForbiddenException} - If the user is not authorized to access this resource.
    */
   @UseGuards(AuthGuard)
-  @Get(':id')
+  @Get('by-id/:id')
   findOne(@Param('id') id: string, @Request() request) {
     this.checkUserAccess(+id, request);
     return this.usersService.findOne(+id);
@@ -51,18 +52,18 @@ export class UsersController {
   /**
    * Retrieves a user by their username.
    * @param {string} username - The username of the user to retrieve.
-   * @returns {Promise<User>} - A promise that resolves to the user object.
+   * @returns {Promise<object>} - A promise that resolves to the user object.
    */
-  @Get('by-username/:username')
-  async findByUsername(@Param('username') username: string) {
-    const user = await this.usersService.findByUsername(username);
-    return user;
+  @UseGuards(AuthGuard)
+  @Get('by-username')
+  findByUsername(@Query('username') username: string) {
+    return this.usersService.findByUsername(username);
   }
 
   /**
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
-   * @returns {Promise<{}>} - A promise that resolves to the created user object.
+   * @returns {Promise<object>} - A promise that resolves to the created user object.
    */
   @HttpCode(HttpStatus.CREATED)
   @Post()
@@ -73,14 +74,12 @@ export class UsersController {
   /**
    * Updates the password of an existing user.
    * Only the user themselves or an admin can access this endpoint.
-   * @param {string} id - The ID of the user to update.
    * @param {UpdateUserPasswordDto} dto - The body containing the dto and adminPass.
-   * @returns {Promise<{}>} - A promise that resolves to the updated user object.
-   * @throws {UnauthorizedException} - If the user is not authorized to access this resource.
+   * @returns {Promise<object>} - A promise that resolves to the updated user object.
    */
-  @Patch('update-password/:id')
-  updatePassword(@Param('id') id: string, @Body() dto: UpdateUserPasswordDto) {
-    return this.usersService.updatePassword(+id, dto);
+  @Patch('update-password')
+  updatePassword(@Body() dto: UpdateUserPasswordDto) {
+    return this.usersService.updatePassword(dto);
   }
 
   /**
