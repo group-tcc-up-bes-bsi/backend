@@ -140,11 +140,6 @@ export class OrganizationsController {
     @Param('userId') userId: string,
     @Request() request,
   ) {
-    const options = {
-      orgId: +orgId,
-      userId: +userId,
-      requestUserId: +request.user.userId,
-    };
-    return this.organizationsService.removeUserFromOrganization(options);
+    return this.organizationsService.removeUserFromOrganization(+orgId, +userId, +request.user.userId);
   }
 }
