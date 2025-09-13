@@ -13,5 +13,6 @@ import { OrganizationsModule } from 'src/organizations/organizations.module';
   imports: [TypeOrmModule.forFeature([Document]), AuthModule, OrganizationsModule],
   controllers: [DocumentsController],
   providers: [DocumentsService],
+  exports: [DocumentsService],
 })
 export class DocumentsModule {}
