@@ -1,6 +1,6 @@
 import {
   Controller,
-  //Get,
+  Get,
   Post,
   Body,
   Patch,
@@ -40,19 +40,38 @@ export class DocumentVersionsController {
     return this.documentVersionsService.create(+request.user.userId, dto);
   }
 
-  /*
-
-  @Get()
-  findAll() {
-    return this.documentVersionsService.findAll();
+  /**
+   * Finds a document version by ID.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - Document Version ID
+   * @returns {Promise<object>} - A promise that resolves to the found document version object.
+   */
+  @Get('id/:id')
+  findOne(@Request() request, @Param('id') id: string): Promise<object> {
+    return this.documentVersionsService.findOne(+request.user.userId, +id);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.documentVersionsService.findOne(+id);
+  /**
+   * Finds document versions by document ID.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - Document ID
+   * @returns {Promise<Array<object>>} - A promise that resolves to an array of document version objects.
+   */
+  @Get('document/:id')
+  findByDocument(@Request() request, @Param('id') id: string): Promise<Array<object>> {
+    return this.documentVersionsService.findVersionsByDocument(+request.user.userId, +id);
   }
 
-  */
+  /**
+   * Finds document versions by user ID.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - User ID
+   * @returns {Promise<Array<object>>} - A promise that resolves to an array of document version objects.
+   */
+  @Get('user/:id')
+  findByUser(@Request() request, @Param('id') id: string): Promise<Array<object>> {
+    return this.documentVersionsService.findVersionsByUser(+request.user.userId, +id);
+  }
 
   /**
    * Updates a document version.

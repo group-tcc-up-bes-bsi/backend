@@ -519,4 +519,333 @@ describe('E2E - DocumentVersions Endpoints', () => {
       expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toBeDefined();
     });
   });
+
+  describe('Get by Id', () => {
+    it('Request without authentication', async () => {
+      return request(app.getHttpServer()).get(`/document-versions/id/1`).send(testDocumentVersion).expect(401);
+    });
+
+    it('Document Version retrieved successfully', async () => {
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocumentVersion)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/id/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(body).toMatchObject({
+        documentVersionId: documentVersionId,
+        name: testDocumentVersion.name,
+        filePath: 'fakePath',
+        creationDate: expect.any(String),
+        documentId,
+        userId,
+      });
+    });
+
+    it('Document Version retrieved successfully - write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocumentVersion)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/id/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200);
+
+      expect(body).toMatchObject({
+        documentVersionId: documentVersionId,
+        name: testDocumentVersion.name,
+        filePath: 'fakePath',
+        creationDate: expect.any(String),
+        documentId,
+        userId,
+      });
+    });
+
+    it('Document Version retrieved successfully - read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocumentVersion)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/id/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200);
+
+      expect(body).toMatchObject({
+        documentVersionId: documentVersionId,
+        name: testDocumentVersion.name,
+        filePath: 'fakePath',
+        creationDate: expect.any(String),
+        documentId,
+        userId,
+      });
+    });
+
+    it('Not retrieved - Document Version does not exist', async () => {
+      await request(app.getHttpServer())
+        .get(`/document-versions/id/9999`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            statusCode: 404,
+            message: 'Document Version not found',
+            error: 'Not Found',
+          });
+        });
+    });
+
+    it('Not retrieved - User not in organization', async () => {
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocumentVersion)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      await request(app.getHttpServer())
+        .get(`/document-versions/id/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have read permissions in this organization',
+            statusCode: 403,
+          });
+        });
+    });
+  });
+
+  describe('Get by Document', () => {
+    it('Request without authentication', async () => {
+      return request(app.getHttpServer()).get(`/document-versions/document/1`).expect(401);
+    });
+
+    it('Document Versions retrieved successfully', async () => {
+      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+
+      for (const name of versionNames) {
+        await request(app.getHttpServer())
+          .post('/document-versions')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ ...testDocumentVersion, name })
+          .expect(201);
+      }
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(body).toHaveLength(versionNames.length);
+
+      body.forEach((version) => {
+        expect(version).toMatchObject({
+          documentVersionId: expect.any(Number),
+          name: expect.any(String),
+          filePath: 'fakePath',
+          creationDate: expect.any(String),
+          documentId,
+          userId,
+        });
+
+        expect(versionNames).toContain(version.name);
+      });
+    });
+
+    it('Document Versions retrieved successfully - write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+
+      for (const name of versionNames) {
+        await request(app.getHttpServer())
+          .post('/document-versions')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ ...testDocumentVersion, name })
+          .expect(201);
+      }
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200);
+
+      expect(body).toHaveLength(versionNames.length);
+
+      body.forEach((version) => {
+        expect(version).toMatchObject({
+          documentVersionId: expect.any(Number),
+          name: expect.any(String),
+          filePath: 'fakePath',
+          creationDate: expect.any(String),
+          documentId,
+          userId,
+        });
+
+        expect(versionNames).toContain(version.name);
+      });
+    });
+
+    it('Document Versions retrieved successfully - read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+
+      for (const name of versionNames) {
+        await request(app.getHttpServer())
+          .post('/document-versions')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ ...testDocumentVersion, name })
+          .expect(201);
+      }
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200);
+
+      expect(body).toHaveLength(versionNames.length);
+
+      body.forEach((version) => {
+        expect(version).toMatchObject({
+          documentVersionId: expect.any(Number),
+          name: expect.any(String),
+          filePath: 'fakePath',
+          creationDate: expect.any(String),
+          documentId,
+          userId,
+        });
+
+        expect(versionNames).toContain(version.name);
+      });
+    });
+
+    it('Not retrieved - Document does not exist', async () => {
+      await request(app.getHttpServer())
+        .get(`/document-versions/document/9999`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            statusCode: 404,
+            message: 'Document not found',
+            error: 'Not Found',
+          });
+        });
+    });
+
+    it('Not retrieved - User not in the organization', async () => {
+      await request(app.getHttpServer())
+        .get(`/document-versions/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have read permissions in this organization',
+            statusCode: 403,
+          });
+        });
+    });
+  });
+
+  describe('Get by User', () => {
+    it('Request without authentication', async () => {
+      return request(app.getHttpServer()).get(`/document-versions/user/1`).expect(401);
+    });
+
+    it('Document Versions retrieved successfully', async () => {
+      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+
+      for (const name of versionNames) {
+        await request(app.getHttpServer())
+          .post('/document-versions')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ ...testDocumentVersion, name })
+          .expect(201);
+      }
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/document-versions/user/${userId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(body).toHaveLength(versionNames.length);
+
+      body.forEach((version) => {
+        expect(version).toMatchObject({
+          documentVersionId: expect.any(Number),
+          name: expect.any(String),
+          filePath: 'fakePath',
+          creationDate: expect.any(String),
+          documentId,
+          userId,
+        });
+
+        expect(versionNames).toContain(version.name);
+      });
+
+      // User 2 is not part of the organization, should return empty.
+      await request(app.getHttpServer())
+        .get(`/document-versions/user/${userId2}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'No Document Versions found for this user',
+            error: 'Not Found',
+            statusCode: 404,
+          });
+        });
+    });
+
+    it('Not retrieved - User is not the same as the authenticated user', async () => {
+      await request(app.getHttpServer())
+        .get(`/document-versions/user/${userId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You can only view your own document versions',
+            statusCode: 403,
+          });
+        });
+    });
+  });
 });

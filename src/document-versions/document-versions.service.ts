@@ -33,6 +33,21 @@ export class DocumentVersionsService {
   ///////////////////////////////////////////////////////////////////////
 
   /**
+   * Check if user has read permission in the organization.
+   * @param {number} userId - User ID.
+   * @param {number} documentId - Document ID.
+   * @throws {ForbiddenException} - If the user is not Reader, Writer or Owner.
+   */
+  private async checkReadPermission(userId: number, documentId: number): Promise<void> {
+    const organizationId = await this.documentsService.getOrganizationId(documentId);
+    const roleArray = [UserType.OWNER, UserType.WRITE, UserType.READ];
+    const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, roleArray);
+    if (!hasPermission) {
+      throw new ForbiddenException('You do not have read permissions in this organization');
+    }
+  }
+
+  /**
    * Check if user has edit permission in the organization.
    * @param {number} userId - User ID.
    * @param {number} documentId - Document ID.
@@ -107,16 +122,59 @@ export class DocumentVersionsService {
       });
   }
 
-  /*
-  findAll() {
-    return `This action returns all documentVersions`;
+  /**
+   * Find the document version by id.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} documentVersionId - ID of the document version to find.
+   * @returns {Promise<DocumentVersion>} - A promise that resolves to the DocumentVersion entity.
+   */
+  findOne(requestUserId: number, documentVersionId: number): Promise<DocumentVersion> {
+    return this.docVersionsRepo.findOneBy({ documentVersionId }).then(async (docVersion) => {
+      if (docVersion) {
+        await this.checkReadPermission(requestUserId, docVersion.documentId);
+        return docVersion;
+      } else {
+        this.logger.log(`Document version with ID ${documentVersionId} not found`);
+        throw new NotFoundException('Document Version not found');
+      }
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} documentVersion`;
+  /**
+   * Find all document versions for a specific document.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} documentId - ID of the document to find.
+   * @returns {Promise<DocumentVersion[]>} - A promise that resolves to an array of DocumentVersion entities.
+   */
+  async findVersionsByDocument(requestUserId: number, documentId: number): Promise<DocumentVersion[]> {
+    await this.checkReadPermission(requestUserId, documentId);
+    return this.docVersionsRepo.findBy({ documentId }).then((docVersions) => {
+      if (docVersions.length === 0) {
+        this.logger.log(`No document versions found for document ID ${documentId}`);
+        throw new NotFoundException('No Document Versions found for this document');
+      }
+      return docVersions;
+    });
   }
 
-  */
+  /**
+   * Find all document versions created by a specific user.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} userId - ID of the user to find.
+   * @returns {Promise<DocumentVersion[]>} - A promise that resolves to an array of DocumentVersion entities.
+   */
+  async findVersionsByUser(requestUserId: number, userId: number): Promise<DocumentVersion[]> {
+    if (requestUserId !== userId) {
+      throw new ForbiddenException('You can only view your own document versions');
+    }
+    return this.docVersionsRepo.findBy({ userId }).then((docVersions) => {
+      if (docVersions.length === 0) {
+        this.logger.log(`No document versions found for user ID ${userId}`);
+        throw new NotFoundException('No Document Versions found for this user');
+      }
+      return docVersions;
+    });
+  }
 
   /**
    * Updates a document version.
