@@ -70,12 +70,16 @@ export class DocumentsService {
     }
   }
 
+  ///////////////////////////////////////////////////////////////////////
+  // Public interfaces
+  ///////////////////////////////////////////////////////////////////////
+
   /**
    * Get Organization ID based on Document ID.
    * @param {number} documentId - Document ID.
    * @returns {number} - Organization ID.
    */
-  private getOrganizationId(documentId: number): Promise<number> {
+  getOrganizationId(documentId: number): Promise<number> {
     return this.documentsRepo
       .findOneBy({ documentId })
       .then((document) => {
@@ -92,10 +96,6 @@ export class DocumentsService {
         throw new Error('Error retrieving document');
       });
   }
-
-  ///////////////////////////////////////////////////////////////////////
-  // Public interfaces
-  ///////////////////////////////////////////////////////////////////////
 
   /**
    * Creates a new document.

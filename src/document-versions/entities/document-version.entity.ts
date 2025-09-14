@@ -1,6 +1,6 @@
 import { Document } from 'src/documents/entities/document.entity';
 import { User } from 'src/users/entities/user.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, RelationId } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 
 /**
  * DocumentVersion entity.
@@ -11,20 +11,20 @@ export class DocumentVersion {
   documentVersionId: number;
 
   @Column({ type: 'varchar', length: 100 })
-  versionName: string;
+  name: string;
 
   @Column({ type: 'varchar', length: 500 })
-  versionFilePath: string;
+  filePath: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
+  creationDate: Date;
 
   /* ------------- From which document is this version ------------- */
   @ManyToOne(() => Document, (document) => document.documentVersions)
   @JoinColumn({ name: 'documentId' })
   document: Document;
 
-  @RelationId((version: DocumentVersion) => version.document)
+  @Column()
   documentId: number;
 
   /* ------------- Who created this version ------------- */
@@ -32,6 +32,6 @@ export class DocumentVersion {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @RelationId((version: DocumentVersion) => version.user)
+  @Column()
   userId: number;
 }
