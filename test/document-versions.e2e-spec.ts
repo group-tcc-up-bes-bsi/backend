@@ -256,6 +256,157 @@ describe('E2E - DocumentVersions Endpoints', () => {
     });
   });
 
+  describe('Update', () => {
+    let documentVersionId: number;
+
+    beforeEach(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocumentVersion)
+        .expect(201)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'Document Version successfully created',
+            documentVersionId: expect.any(Number),
+          });
+        });
+
+      documentVersionId = body.documentVersionId;
+    });
+
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch(`/document-versions/${documentVersionId}`).expect(401);
+    });
+
+    it('Document Version updated successfully', async () => {
+      const newName = 'Document v1.1';
+
+      const { body } = await request(app.getHttpServer())
+        .patch(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: newName })
+        .expect(200);
+
+      expect(body).toMatchObject({
+        message: 'Document Version successfully updated',
+        documentVersionId,
+      });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toMatchObject({
+        ...testDocumentVersion,
+        documentVersionId,
+        name: newName,
+        filePath: 'fakePath',
+        creationDate: expect.any(Date),
+        userId,
+      });
+    });
+
+    it('Document Version updated successfully - write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const newName = 'Document v1.1';
+
+      const { body } = await request(app.getHttpServer())
+        .patch(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send({ name: newName })
+        .expect(200);
+
+      expect(body).toMatchObject({
+        message: 'Document Version successfully updated',
+        documentVersionId,
+      });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toMatchObject({
+        ...testDocumentVersion,
+        documentVersionId,
+        name: newName,
+        filePath: 'fakePath',
+        creationDate: expect.any(Date),
+        userId,
+      });
+    });
+
+    it('Not updated - Document Version does not exist', async () => {
+      await request(app.getHttpServer())
+        .patch(`/document-versions/9999`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: 'some name' })
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            statusCode: 404,
+            message: 'Document Version not found',
+            error: 'Not Found',
+          });
+        });
+    });
+
+    it('Not updated - Missing fields', async () => {
+      await request(app.getHttpServer())
+        .patch(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(400)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Bad Request',
+            message: ['name must be a string'],
+            statusCode: 400,
+          });
+        });
+    });
+
+    it('Not updated - User have read permission', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      await request(app.getHttpServer())
+        .patch(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send({ name: 'some name' })
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have edit permissions in this organization',
+            statusCode: 403,
+          });
+        });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toMatchObject(
+        testDocumentVersion,
+      );
+    });
+
+    it('Not updated - User not in organization', async () => {
+      await request(app.getHttpServer())
+        .patch(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .send({ name: 'some name' })
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have edit permissions in this organization',
+            statusCode: 403,
+          });
+        });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toMatchObject(
+        testDocumentVersion,
+      );
+    });
+  });
+
   describe('Delete', () => {
     let documentVersionId: number;
 

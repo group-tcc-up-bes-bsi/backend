@@ -3,7 +3,7 @@ import {
   //Get,
   Post,
   Body,
-  //Patch,
+  Patch,
   Param,
   Delete,
   UseGuards,
@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { DocumentVersionsService } from './document-versions.service';
 import { CreateDocumentVersionDto } from './dto/create-document-version.dto';
-//import { UpdateDocumentVersionDto } from './dto/update-document-version.dto';
+import { UpdateDocumentVersionDto } from './dto/update-document-version.dto';
 import { AuthGuard } from 'src/auth/guards/auth.guards';
 
 /**
@@ -52,12 +52,19 @@ export class DocumentVersionsController {
     return this.documentVersionsService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDocumentVersionDto: UpdateDocumentVersionDto) {
-    return this.documentVersionsService.update(+id, updateDocumentVersionDto);
-  }
-
   */
+
+  /**
+   * Updates a document version.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - Document Version ID
+   * @param {UpdateDocumentVersionDto} dto - DocumentVersion data transfer object.
+   * @returns {Promise<object>} - A promise that resolves when the document version object is updated.
+   */
+  @Patch(':id')
+  update(@Request() request, @Param('id') id: string, @Body() dto: UpdateDocumentVersionDto): Promise<object> {
+    return this.documentVersionsService.update(+request.user.userId, +id, dto);
+  }
 
   /**
    * Deletes a document version.

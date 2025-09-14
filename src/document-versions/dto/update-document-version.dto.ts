@@ -1,5 +1,9 @@
-/* eslint-disable jsdoc/require-jsdoc */
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateDocumentVersionDto } from './create-document-version.dto';
+import { IsString } from 'class-validator';
 
-export class UpdateDocumentVersionDto extends PartialType(CreateDocumentVersionDto) {}
+/**
+ * Data Transfer Object for updating a document version.
+ */
+export class UpdateDocumentVersionDto {
+  @IsString()
+  name: string;
+}

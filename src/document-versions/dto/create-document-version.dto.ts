@@ -1,6 +1,8 @@
 import { IsNumber, IsString } from 'class-validator';
 
-/* eslint-disable jsdoc/require-jsdoc */
+/**
+ * Data Transfer Object for creating a document version.
+ */
 export class CreateDocumentVersionDto {
   @IsString()
   name: string;

@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateDocumentVersionDto } from './dto/create-document-version.dto';
-//import { UpdateDocumentVersionDto } from './dto/update-document-version.dto';
+import { UpdateDocumentVersionDto } from './dto/update-document-version.dto';
 import { DocumentVersion } from './entities/document-version.entity';
 import { Repository } from 'typeorm';
 import { OrganizationsService } from 'src/organizations/organizations.service';
@@ -116,11 +116,41 @@ export class DocumentVersionsService {
     return `This action returns a #${id} documentVersion`;
   }
 
-  update(id: number, updateDocumentVersionDto: UpdateDocumentVersionDto) {
-    return `This action updates a #${id} documentVersion`;
-  }
-
   */
+
+  /**
+   * Updates a document version.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} documentVersionId - ID of the document version to update.
+   * @param {UpdateDocumentVersionDto} dto - DocumentVersion data transfer object.
+   * @returns {Promise<object>} - A promise that resolves when the document version object is updated.
+   */
+  async update(requestUserId: number, documentVersionId: number, dto: UpdateDocumentVersionDto): Promise<object> {
+    const docVersion = await this.docVersionsRepo.findOneBy({ documentVersionId });
+
+    if (!docVersion) {
+      this.logger.warn(`Document version with ID ${documentVersionId} not found for update`);
+      throw new NotFoundException('Document Version not found');
+    }
+
+    await this.checkEditPermission(requestUserId, docVersion.documentId);
+
+    return this.docVersionsRepo
+      .update(documentVersionId, dto)
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`Document with ID ${documentVersionId} successfully updated`);
+          return {
+            message: 'Document Version successfully updated',
+            documentVersionId,
+          };
+        }
+      })
+      .catch((error) => {
+        this.logger.error(`Error updating document version: ${error}`);
+        throw new Error('Error updating document version');
+      });
+  }
 
   /**
    * Removes a document version.
