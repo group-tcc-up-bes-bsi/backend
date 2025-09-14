@@ -10,11 +10,15 @@ import {
   HttpCode,
   HttpStatus,
   Request,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { DocumentVersionsService } from './document-versions.service';
 import { CreateDocumentVersionDto } from './dto/create-document-version.dto';
 import { UpdateDocumentVersionDto } from './dto/update-document-version.dto';
 import { AuthGuard } from 'src/auth/guards/auth.guards';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage, File } from 'multer';
 
 /**
  * Controller for managing document versions.
@@ -32,12 +36,19 @@ export class DocumentVersionsController {
    * Creates a new document version.
    * @param {Request} request - The request object containing user information.
    * @param {CreateDocumentVersionDto} dto - DocumentVersion data transfer object.
+   * @param {File} file - The uploaded file.
    * @returns {Promise<{}>} - A promise that resolves when the document version object is created.
    */
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(), // Armazena temporariamente na memória
+      limits: { fileSize: 100 * 1024 * 1024 }, // Ex: 10 MB
+    }),
+  )
   @Post()
-  create(@Request() request, @Body() dto: CreateDocumentVersionDto): Promise<object> {
-    return this.documentVersionsService.create(+request.user.userId, dto);
+  create(@Request() request, @Body() dto: CreateDocumentVersionDto, @UploadedFile() file: File): Promise<object> {
+    return this.documentVersionsService.create(+request.user.userId, dto, file);
   }
 
   /**

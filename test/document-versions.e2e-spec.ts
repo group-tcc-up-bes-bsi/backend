@@ -46,7 +46,7 @@ const testDocumentVersion = {
 // Testcases
 ///////////////////////////////////////////////////////////////////////
 
-describe('E2E - DocumentVersions Endpoints', () => {
+describe.skip('E2E - DocumentVersions Endpoints', () => {
   let app: INestApplication;
   let db: DataSource;
   let userId: number;

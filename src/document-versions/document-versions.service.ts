@@ -7,6 +7,8 @@ import { OrganizationsService } from 'src/organizations/organizations.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
 import { DocumentsService } from 'src/documents/documents.service';
+import { File } from 'multer';
+import { writeFileSync } from 'fs';
 
 /**
  * Service for managing document versions.
@@ -84,9 +86,10 @@ export class DocumentVersionsService {
    * Creates a new document version.
    * @param {number} requestUserId - ID of the user making the request.
    * @param {CreateDocumentVersionDto} dto - DocumentVersion data transfer object.
+   * @param {File} file - The uploaded file.
    * @returns {Promise<{}>} - A promise that resolves when the document version object is created.
    */
-  async create(requestUserId: number, dto: CreateDocumentVersionDto): Promise<object> {
+  async create(requestUserId: number, dto: CreateDocumentVersionDto, file: File): Promise<object> {
     await this.checkEditPermission(requestUserId, dto.documentId);
 
     // Check if a version with the same name already exists for the document.
@@ -99,6 +102,9 @@ export class DocumentVersionsService {
           throw new BadRequestException('A version with this name already exists for this document');
         }
       });
+
+    // 3. Salva manualmente no disco
+    writeFileSync('/home/joao/teste/doc.txt', file.buffer);
 
     return this.docVersionsRepo
       .save(

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsNumber, IsString } from 'class-validator';
 
 /**
@@ -7,6 +8,7 @@ export class CreateDocumentVersionDto {
   @IsString()
   name: string;
 
+  @Type(() => Number)
   @IsNumber()
   documentId: number;
 }
