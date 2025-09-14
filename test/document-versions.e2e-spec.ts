@@ -255,4 +255,117 @@ describe('E2E - DocumentVersions Endpoints', () => {
         });
     });
   });
+
+  describe('Delete', () => {
+    let documentVersionId: number;
+
+    beforeEach(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocumentVersion)
+        .expect(201)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'Document Version successfully created',
+            documentVersionId: expect.any(Number),
+          });
+        });
+
+      documentVersionId = body.documentVersionId;
+    });
+
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).delete(`/document-versions/${documentVersionId}`).expect(401);
+    });
+
+    it('Document Version removed successfully', async () => {
+      await request(app.getHttpServer())
+        .delete(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'Document Version successfully removed',
+            documentVersionId,
+          });
+        });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toBeNull();
+    });
+
+    it('Not removed - Document Version does not exist', async () => {
+      await request(app.getHttpServer())
+        .delete(`/document-versions/9999`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            statusCode: 404,
+            message: 'Document Version not found',
+            error: 'Not Found',
+          });
+        });
+    });
+
+    it('Not removed - User have write permission', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have owner permissions in this organization',
+            statusCode: 403,
+          });
+        });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toBeDefined();
+    });
+
+    it('Not removed - User have read permission', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have owner permissions in this organization',
+            statusCode: 403,
+          });
+        });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toBeDefined();
+    });
+
+    it('Not removed - User not in organization', async () => {
+      await request(app.getHttpServer())
+        .delete(`/document-versions/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have owner permissions in this organization',
+            statusCode: 403,
+          });
+        });
+
+      expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toBeDefined();
+    });
+  });
 });

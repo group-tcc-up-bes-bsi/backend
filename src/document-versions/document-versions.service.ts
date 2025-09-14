@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateDocumentVersionDto } from './dto/create-document-version.dto';
 //import { UpdateDocumentVersionDto } from './dto/update-document-version.dto';
 import { DocumentVersion } from './entities/document-version.entity';
@@ -44,6 +44,20 @@ export class DocumentVersionsService {
     const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, roleArray);
     if (!hasPermission) {
       throw new ForbiddenException('You do not have edit permissions in this organization');
+    }
+  }
+
+  /**
+   * Check if user has owner permission in the organization.
+   * @param {number} userId - User ID.
+   * @param {number} documentId - Document ID.
+   * @throws {ForbiddenException} - If the user is not Owner.
+   */
+  private async checkOwnerPermission(userId: number, documentId: number): Promise<void> {
+    const organizationId = await this.documentsService.getOrganizationId(documentId);
+    const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, [UserType.OWNER]);
+    if (!hasPermission) {
+      throw new ForbiddenException('You do not have owner permissions in this organization');
     }
   }
 
@@ -106,8 +120,34 @@ export class DocumentVersionsService {
     return `This action updates a #${id} documentVersion`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} documentVersion`;
-  }
   */
+
+  /**
+   * Removes a document version.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} documentVersionId - ID of the document version to remove.
+   * @returns {Promise<object>} - A promise that resolves when the document version is removed.
+   */
+  async remove(requestUserId: number, documentVersionId: number): Promise<object> {
+    const docVersion = await this.docVersionsRepo.findOneBy({ documentVersionId });
+    if (docVersion) {
+      await this.checkOwnerPermission(requestUserId, docVersion.documentId);
+      return this.docVersionsRepo
+        .remove(docVersion)
+        .then(() => {
+          this.logger.log(`Document version with ID ${documentVersionId} successfully removed`);
+          return {
+            message: 'Document Version successfully removed',
+            documentVersionId,
+          };
+        })
+        .catch((e) => {
+          this.logger.error(`Error removing document version with ID ${documentVersionId}`, e.stack);
+          throw new Error('Error deleting document version');
+        });
+    } else {
+      this.logger.warn(`Document version with ID ${documentVersionId} not found for removal`);
+      throw new NotFoundException('Document Version not found');
+    }
+  }
 }

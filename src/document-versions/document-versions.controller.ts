@@ -4,8 +4,8 @@ import {
   Post,
   Body,
   //Patch,
-  //Param,
-  //Delete,
+  Param,
+  Delete,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -57,10 +57,16 @@ export class DocumentVersionsController {
     return this.documentVersionsService.update(+id, updateDocumentVersionDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.documentVersionsService.remove(+id);
-  }
-
   */
+
+  /**
+   * Deletes a document version.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - Document Version ID
+   * @returns {Promise<object>} - A promise that resolves when the document version is deleted.
+   */
+  @Delete(':id')
+  remove(@Request() request, @Param('id') id: string): Promise<object> {
+    return this.documentVersionsService.remove(+request.user.userId, +id);
+  }
 }
