@@ -17,7 +17,7 @@ export class DocumentVersion {
   filePath: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
+  creationDate: Date;
 
   /* ------------- From which document is this version ------------- */
   @ManyToOne(() => Document, (document) => document.documentVersions)
