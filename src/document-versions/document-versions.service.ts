@@ -8,8 +8,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
 import { DocumentsService } from 'src/documents/documents.service';
 import { File } from 'multer';
-import { mkdirSync, writeFileSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { ConfigService } from '@nestjs/config';
+import * as mime from 'mime-types';
+import { basename, extname } from 'path';
+
+interface DownloadedFile {
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
+}
 
 /**
  * Service for managing document versions.
@@ -148,6 +156,37 @@ export class DocumentVersionsService {
         this.logger.error(`Error saving document version: ${error}`);
         throw new Error('Error saving document version');
       });
+  }
+
+  /**
+   * Read the file to download a document version.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} documentVersionId - ID of the document version to download.
+   * @returns {object} - An object containing the file buffer, filename, and mimeType.
+   */
+  async downloadVersion(requestUserId: number, documentVersionId: number): Promise<DownloadedFile> {
+    const docVersion = await this.docVersionsRepo.findOneBy({ documentVersionId });
+    if (!docVersion) {
+      this.logger.warn(`Document version with ID ${documentVersionId} not found for download`);
+      throw new NotFoundException('Document Version not found');
+    }
+
+    await this.checkReadPermission(requestUserId, docVersion.documentId);
+
+    try {
+      const buffer = readFileSync(docVersion.filePath);
+      const filename = basename(docVersion.filePath);
+      const mimeType = mime.lookup(extname(filename)) || 'application/octet-stream';
+
+      return {
+        buffer,
+        filename,
+        mimeType,
+      };
+    } catch (error) {
+      this.logger.error(`Error reading file for document version ID ${documentVersionId}: ${error}`);
+      throw new Error('Error reading file');
+    }
   }
 
   /**

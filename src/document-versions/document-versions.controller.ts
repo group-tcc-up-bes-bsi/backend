@@ -12,6 +12,7 @@ import {
   Request,
   UploadedFile,
   UseInterceptors,
+  Response,
 } from '@nestjs/common';
 import { DocumentVersionsService } from './document-versions.service';
 import { CreateDocumentVersionDto } from './dto/create-document-version.dto';
@@ -49,6 +50,26 @@ export class DocumentVersionsController {
   @Post()
   create(@Request() request, @Body() dto: CreateDocumentVersionDto, @UploadedFile() file: File): Promise<object> {
     return this.documentVersionsService.create(+request.user.userId, dto, file);
+  }
+
+  /**
+   * Downloads a document version by ID.
+   * @param {Request} request - The request object containing user information.
+   * @param {Response} response - The response object to send the file.
+   * @param {string} id - Document Version ID
+   * @returns {Promise<void>} - A promise that resolves when the file is sent.
+   */
+  @Get('download/:id')
+  async download(@Request() request, @Response() response, @Param('id') id: string): Promise<void> {
+    const { buffer, filename, mimeType } = await this.documentVersionsService.downloadVersion(
+      +request.user.userId,
+      +id,
+    );
+    response.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    response.send(buffer);
   }
 
   /**
