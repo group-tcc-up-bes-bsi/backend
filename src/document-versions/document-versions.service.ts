@@ -110,6 +110,14 @@ export class DocumentVersionsService {
       throw new BadRequestException('File is required');
     }
 
+    // Validate version name: only letters, numbers, hyphens, and underscores are allowed.
+    const invalidName = /[^a-zA-Z0-9_-]/.test(dto.name);
+    if (invalidName) {
+      throw new BadRequestException(
+        'Version name contains invalid characters. Only letters, numbers, "-", and "_" are allowed.',
+      );
+    }
+
     // Check if a version with the same name already exists for the document.
     await this.docVersionsRepo
       .findOne({

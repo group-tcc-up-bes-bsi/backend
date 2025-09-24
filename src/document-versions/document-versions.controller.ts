@@ -68,6 +68,7 @@ export class DocumentVersionsController {
     response.set({
       'Content-Type': mimeType,
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
     });
     response.send(buffer);
   }
