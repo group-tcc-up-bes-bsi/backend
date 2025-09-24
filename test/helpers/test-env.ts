@@ -15,6 +15,5 @@ export function setEnvironmentVariables() {
   process.env.JWT_EXPIRE = '1h';
 
   process.env.ADMINPASS = 'doc_dash';
-  // Definindo FILE_SAVE_PATH automaticamente, usando a pasta temporária do sistema
   process.env.FILE_SAVE_PATH = path.join(os.tmpdir(), 'doc_dash_files');
 }
