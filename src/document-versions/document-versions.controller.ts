@@ -43,8 +43,8 @@ export class DocumentVersionsController {
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(), // Armazena temporariamente na memória
-      limits: { fileSize: 100 * 1024 * 1024 }, // Ex: 10 MB
+      storage: memoryStorage(),
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB of file size limit
     }),
   )
   @Post()
