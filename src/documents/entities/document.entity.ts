@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Organization } from 'src/organizations/entities/organization.entity';
 import { DocumentVersion } from 'src/document-versions/entities/document-version.entity';
+import { UserFavoriteDoc } from 'src/users/entities/user-favorite-doc.entity';
 
 /**
  * Document entity.
@@ -41,4 +42,8 @@ export class Document {
 
   @Column()
   organizationId: number;
+
+  /* ------------- Users who favorited this document ------------- */
+  @OneToMany(() => UserFavoriteDoc, (favoriteDoc) => favoriteDoc.document)
+  favoritedBy: UserFavoriteDoc[];
 }
