@@ -661,6 +661,119 @@ describe('E2E - Documents Endpoints', () => {
     });
   });
 
+  describe('Update active version ID', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch('/documents/1/active-version/1').send(testDocument).expect(401);
+    });
+
+    it('Active version ID updated successfully', async () => {
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/active-version/44`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document active version successfully updated',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...testDocument,
+        documentId,
+        activeVersionId: 44,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+      });
+    });
+
+    it('Active version ID updated successfully - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/active-version/44`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document active version successfully updated',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...testDocument,
+        documentId,
+        activeVersionId: 44,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Active version ID not updated - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/active-version/44`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not found', () => {
+      return request(app.getHttpServer())
+        .patch('/documents/999/active-version/1')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+    });
+  });
+
   describe('Delete', () => {
     it('Request without authentication', () => {
       return request(app.getHttpServer()).delete('/documents/1').send(testDocument).expect(401);

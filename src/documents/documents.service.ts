@@ -164,6 +164,67 @@ export class DocumentsService {
   }
 
   /**
+   * Updates the last modified date and active version ID of a document.
+   * This should not be called directly by controllers.
+   * @param {number} documentId - The ID of the document to update.
+   * @param {number} documentVersionId - The ID of the document version to set as active.
+   * @returns {Promise<boolean>} A promise that resolves to true if the update was successful.
+   */
+  updateLastModifiedDate(documentId: number, documentVersionId: number): Promise<boolean> {
+    return this.documentsRepo
+      .update(documentId, { lastModifiedDate: new Date(), activeVersionId: documentVersionId })
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`Document with ID ${documentId} lastModifiedDate successfully updated`);
+          return true;
+        } else {
+          this.logger.warn(`No document found with ID ${documentId} to update lastModifiedDate`);
+          throw new NotFoundException('Document not found');
+        }
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error updating last modified date for document ${documentId}`, e.stack);
+        throw new Error('Error updating document');
+      });
+  }
+
+  /**
+   * Updates the active version ID of a document.
+   * Only users with edit permissions can update the active version ID.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @param {number} documentId - The ID of the document to update.
+   * @param {number} documentVersionId - The ID of the document version to set as active.
+   * @returns {Promise<object>} - A promise that resolves to an object containing a message and the document ID.
+   */
+  async updateActiveVersionId(requestUserId: number, documentId: number, documentVersionId: number): Promise<object> {
+    await this.checkEditPermission(requestUserId, await this.getOrganizationId(documentId));
+    return this.documentsRepo
+      .update(documentId, { activeVersionId: documentVersionId })
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`Document with ID ${documentId} activeVersionId successfully updated`);
+          return {
+            message: 'Document active version successfully updated',
+            documentId,
+          };
+        } else {
+          this.logger.warn(`No document found with ID ${documentId} to update activeVersionId`);
+          throw new NotFoundException('Document not found');
+        }
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error updating active version ID for document ${documentId}`, e.stack);
+        throw new Error('Error updating document');
+      });
+  }
+
+  /**
    * Removes a document by its ID.
    * @param {number} requestUserId - The ID of the user making the request.
    * @param {number} documentId - The ID of the document to remove.
