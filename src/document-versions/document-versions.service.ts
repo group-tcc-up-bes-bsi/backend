@@ -7,6 +7,17 @@ import { OrganizationsService } from 'src/organizations/organizations.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
 import { DocumentsService } from 'src/documents/documents.service';
+import { File } from 'multer';
+import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { ConfigService } from '@nestjs/config';
+import * as mime from 'mime-types';
+import { basename, extname } from 'path';
+
+interface DownloadedFile {
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
+}
 
 /**
  * Service for managing document versions.
@@ -14,19 +25,24 @@ import { DocumentsService } from 'src/documents/documents.service';
 @Injectable()
 export class DocumentVersionsService {
   private readonly logger = new Logger(DocumentVersionsService.name);
+  private fileSavePath: string;
 
   /**
    * Creates an instance of DocumentVersionsService.
    * @param {Repository<DocumentVersion>} docVersionsRepo - The repository for document version entities.
    * @param {OrganizationsService} organizationsService - The service for managing organizations.
    * @param {DocumentsService} documentsService - The service for managing documents.
+   * @param {ConfigService} configService - The configuration service to access environment variables.
    */
   constructor(
     @InjectRepository(DocumentVersion)
     private readonly docVersionsRepo: Repository<DocumentVersion>,
     private organizationsService: OrganizationsService,
     private documentsService: DocumentsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.fileSavePath = configService.get('FILE_SAVE_PATH');
+  }
 
   ///////////////////////////////////////////////////////////////////////
   // Private functions
@@ -84,10 +100,23 @@ export class DocumentVersionsService {
    * Creates a new document version.
    * @param {number} requestUserId - ID of the user making the request.
    * @param {CreateDocumentVersionDto} dto - DocumentVersion data transfer object.
+   * @param {File} file - The uploaded file.
    * @returns {Promise<{}>} - A promise that resolves when the document version object is created.
    */
-  async create(requestUserId: number, dto: CreateDocumentVersionDto): Promise<object> {
+  async create(requestUserId: number, dto: CreateDocumentVersionDto, file: File): Promise<object> {
     await this.checkEditPermission(requestUserId, dto.documentId);
+
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    // Validate version name: only letters, numbers, hyphens, and underscores are allowed.
+    const invalidName = /[^a-zA-Z0-9_-]/.test(dto.name);
+    if (invalidName) {
+      throw new BadRequestException(
+        'Version name contains invalid characters. Only letters, numbers, "-", and "_" are allowed.',
+      );
+    }
 
     // Check if a version with the same name already exists for the document.
     await this.docVersionsRepo
@@ -100,11 +129,26 @@ export class DocumentVersionsService {
         }
       });
 
+    const organizationId = await this.documentsService.getOrganizationId(dto.documentId);
+
+    const fileExtension = file.originalname.split('.').pop();
+    const dirPath = `${this.fileSavePath}/org_${organizationId}/doc_${dto.documentId}/`;
+    const filePath = `${dirPath}version_${dto.name}.${fileExtension}`;
+
+    try {
+      this.logger.log(`Saving file to ${filePath}`);
+      mkdirSync(dirPath, { recursive: true });
+      writeFileSync(filePath, file.buffer);
+    } catch (error) {
+      this.logger.error(`Error saving file: ${error}`);
+      throw new Error('Error saving file');
+    }
+
     return this.docVersionsRepo
       .save(
         this.docVersionsRepo.create({
           name: dto.name,
-          filePath: 'fakePath',
+          filePath,
           documentId: dto.documentId,
           userId: requestUserId,
         }),
@@ -123,16 +167,53 @@ export class DocumentVersionsService {
   }
 
   /**
+   * Read the file to download a document version.
+   * @param {number} requestUserId - ID of the user making the request.
+   * @param {number} documentVersionId - ID of the document version to download.
+   * @returns {object} - An object containing the file buffer, filename, and mimeType.
+   */
+  async downloadVersion(requestUserId: number, documentVersionId: number): Promise<DownloadedFile> {
+    const docVersion = await this.docVersionsRepo.findOneBy({ documentVersionId });
+    if (!docVersion) {
+      this.logger.warn(`Document version with ID ${documentVersionId} not found for download`);
+      throw new NotFoundException('Document Version not found');
+    }
+
+    await this.checkReadPermission(requestUserId, docVersion.documentId);
+
+    try {
+      const buffer = readFileSync(docVersion.filePath);
+      const filename = basename(docVersion.filePath);
+      const mimeType = mime.lookup(extname(filename)) || 'application/octet-stream';
+
+      return {
+        buffer,
+        filename,
+        mimeType,
+      };
+    } catch (error) {
+      this.logger.error(`Error reading file for document version ID ${documentVersionId}: ${error}`);
+      throw new Error('Error reading file');
+    }
+  }
+
+  /**
    * Find the document version by id.
    * @param {number} requestUserId - ID of the user making the request.
    * @param {number} documentVersionId - ID of the document version to find.
    * @returns {Promise<DocumentVersion>} - A promise that resolves to the DocumentVersion entity.
    */
-  findOne(requestUserId: number, documentVersionId: number): Promise<DocumentVersion> {
+  findOne(requestUserId: number, documentVersionId: number): Promise<object> {
     return this.docVersionsRepo.findOneBy({ documentVersionId }).then(async (docVersion) => {
       if (docVersion) {
         await this.checkReadPermission(requestUserId, docVersion.documentId);
-        return docVersion;
+        return {
+          documentVersionId: docVersion.documentVersionId,
+          name: docVersion.name,
+          creationDate: docVersion.creationDate,
+          documentId: docVersion.documentId,
+          userId: docVersion.userId,
+        };
       } else {
         this.logger.log(`Document version with ID ${documentVersionId} not found`);
         throw new NotFoundException('Document Version not found');
@@ -146,14 +227,20 @@ export class DocumentVersionsService {
    * @param {number} documentId - ID of the document to find.
    * @returns {Promise<DocumentVersion[]>} - A promise that resolves to an array of DocumentVersion entities.
    */
-  async findVersionsByDocument(requestUserId: number, documentId: number): Promise<DocumentVersion[]> {
+  async findVersionsByDocument(requestUserId: number, documentId: number): Promise<object[]> {
     await this.checkReadPermission(requestUserId, documentId);
     return this.docVersionsRepo.findBy({ documentId }).then((docVersions) => {
       if (docVersions.length === 0) {
         this.logger.log(`No document versions found for document ID ${documentId}`);
         throw new NotFoundException('No Document Versions found for this document');
       }
-      return docVersions;
+      return docVersions.map((docVersion) => ({
+        documentVersionId: docVersion.documentVersionId,
+        name: docVersion.name,
+        creationDate: docVersion.creationDate,
+        documentId: docVersion.documentId,
+        userId: docVersion.userId,
+      }));
     });
   }
 
@@ -163,7 +250,7 @@ export class DocumentVersionsService {
    * @param {number} userId - ID of the user to find.
    * @returns {Promise<DocumentVersion[]>} - A promise that resolves to an array of DocumentVersion entities.
    */
-  async findVersionsByUser(requestUserId: number, userId: number): Promise<DocumentVersion[]> {
+  async findVersionsByUser(requestUserId: number, userId: number): Promise<object[]> {
     if (requestUserId !== userId) {
       throw new ForbiddenException('You can only view your own document versions');
     }
@@ -172,7 +259,13 @@ export class DocumentVersionsService {
         this.logger.log(`No document versions found for user ID ${userId}`);
         throw new NotFoundException('No Document Versions found for this user');
       }
-      return docVersions;
+      return docVersions.map((docVersion) => ({
+        documentVersionId: docVersion.documentVersionId,
+        name: docVersion.name,
+        creationDate: docVersion.creationDate,
+        documentId: docVersion.documentId,
+        userId: docVersion.userId,
+      }));
     });
   }
 

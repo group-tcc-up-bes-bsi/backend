@@ -9,6 +9,8 @@ import * as epUtils from './helpers/endpoint-utils';
 import { Organization, OrganizationType } from 'src/organizations/entities/organization.entity';
 import { DocumentVersion } from 'src/document-versions/entities/document-version.entity';
 import { OrganizationUser } from 'src/organizations/entities/organization-user.entity';
+import * as path from 'path';
+import { readFileSync, rmSync } from 'fs';
 
 //////////////////////////////////////////////////////////////////////
 // Test entity objects
@@ -38,9 +40,11 @@ const testDocument = {
 };
 
 const testDocumentVersion = {
-  name: 'Document v1.0',
+  name: 'Document_v1',
   documentId: null,
 };
+
+const testDocumentFilePath = path.join(__dirname, './test_files/lorem.docx');
 
 //////////////////////////////////////////////////////////////////////
 // Testcases
@@ -55,6 +59,7 @@ describe('E2E - DocumentVersions Endpoints', () => {
   let authToken2: string;
   let organizationId: number;
   let documentId: number;
+  let savedFilePath: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -88,29 +93,47 @@ describe('E2E - DocumentVersions Endpoints', () => {
 
     documentId = body.documentId;
     testDocumentVersion.documentId = documentId;
+
+    savedFilePath = `${process.env.FILE_SAVE_PATH}/org_${organizationId}/doc_${testDocumentVersion.documentId}/version_${testDocumentVersion.name}.docx`;
   });
 
   afterAll(async () => {
     await app.close();
   });
 
+  afterEach(() =>
+    rmSync(`${process.env.FILE_SAVE_PATH}/org_${organizationId}/doc_${testDocumentVersion.documentId}/`, {
+      force: true,
+      recursive: true,
+    }),
+  );
+
   describe('Create', () => {
     it('Request without authentication', () => {
-      return request(app.getHttpServer()).post('/document-versions').send(testDocumentVersion).expect(401);
+      return request(app.getHttpServer())
+        .post('/document-versions')
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
+        .expect(401);
     });
 
     it('Document Version created successfully', async () => {
       const { body } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
 
+      // Check response body
       expect(body).toMatchObject({
         message: 'Document Version successfully created',
         documentVersionId: expect.any(Number),
       });
 
+      // Check database entry
       expect(
         await db.getRepository(DocumentVersion).findOne({
           where: { documentId: body.documentVersionId },
@@ -118,10 +141,13 @@ describe('E2E - DocumentVersions Endpoints', () => {
       ).toMatchObject({
         ...testDocumentVersion,
         documentVersionId: body.documentVersionId,
-        filePath: 'fakePath',
+        filePath: savedFilePath,
         creationDate: expect.any(Date),
         userId,
       });
+
+      // Check if file was saved correctly
+      expect(readFileSync(savedFilePath)).toEqual(readFileSync(testDocumentFilePath));
     });
 
     it('Document Version created successfully - write permissions', async () => {
@@ -134,14 +160,18 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken2}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
 
+      // Check response body
       expect(body).toMatchObject({
         message: 'Document Version successfully created',
         documentVersionId: expect.any(Number),
       });
 
+      // Check database entry
       expect(
         await db.getRepository(DocumentVersion).findOne({
           where: { documentId: body.documentVersionId },
@@ -149,17 +179,22 @@ describe('E2E - DocumentVersions Endpoints', () => {
       ).toMatchObject({
         ...testDocumentVersion,
         documentVersionId: body.documentVersionId,
-        filePath: 'fakePath',
+        filePath: savedFilePath,
         creationDate: expect.any(Date),
         userId: userId2,
       });
+
+      // Check if file was saved correctly
+      expect(readFileSync(savedFilePath)).toEqual(readFileSync(testDocumentFilePath));
     });
 
     it('Not created - Trying to create a version with same name', async () => {
       const { body } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
 
       expect(body).toMatchObject({
@@ -170,7 +205,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(400)
         .expect(({ body }) => {
           expect(body).toMatchObject({
@@ -205,10 +242,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          name: 'some version',
-          documentId: 9999,
-        })
+        .field('documentId', '9999')
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(404)
         .expect(({ body }) => {
           expect(body).toMatchObject({
@@ -229,7 +265,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken2}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(403)
         .expect(({ body }) => {
           expect(body).toMatchObject({
@@ -244,7 +282,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken2}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(403)
         .expect(({ body }) => {
           expect(body).toMatchObject({
@@ -263,7 +303,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201)
         .expect(({ body }) => {
           expect(body).toMatchObject({
@@ -297,7 +339,7 @@ describe('E2E - DocumentVersions Endpoints', () => {
         ...testDocumentVersion,
         documentVersionId,
         name: newName,
-        filePath: 'fakePath',
+        filePath: savedFilePath,
         creationDate: expect.any(Date),
         userId,
       });
@@ -327,7 +369,7 @@ describe('E2E - DocumentVersions Endpoints', () => {
         ...testDocumentVersion,
         documentVersionId,
         name: newName,
-        filePath: 'fakePath',
+        filePath: savedFilePath,
         creationDate: expect.any(Date),
         userId,
       });
@@ -414,7 +456,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201)
         .expect(({ body }) => {
           expect(body).toMatchObject({
@@ -529,7 +573,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body: createBody } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
       const documentVersionId = createBody.documentVersionId;
 
@@ -541,7 +587,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
       expect(body).toMatchObject({
         documentVersionId: documentVersionId,
         name: testDocumentVersion.name,
-        filePath: 'fakePath',
         creationDate: expect.any(String),
         documentId,
         userId,
@@ -558,7 +603,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body: createBody } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
       const documentVersionId = createBody.documentVersionId;
 
@@ -570,7 +617,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
       expect(body).toMatchObject({
         documentVersionId: documentVersionId,
         name: testDocumentVersion.name,
-        filePath: 'fakePath',
         creationDate: expect.any(String),
         documentId,
         userId,
@@ -587,7 +633,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body: createBody } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
       const documentVersionId = createBody.documentVersionId;
 
@@ -599,7 +647,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
       expect(body).toMatchObject({
         documentVersionId: documentVersionId,
         name: testDocumentVersion.name,
-        filePath: 'fakePath',
         creationDate: expect.any(String),
         documentId,
         userId,
@@ -624,7 +671,9 @@ describe('E2E - DocumentVersions Endpoints', () => {
       const { body: createBody } = await request(app.getHttpServer())
         .post('/document-versions')
         .set('Authorization', `Bearer ${authToken}`)
-        .send(testDocumentVersion)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
         .expect(201);
       const documentVersionId = createBody.documentVersionId;
 
@@ -648,13 +697,15 @@ describe('E2E - DocumentVersions Endpoints', () => {
     });
 
     it('Document Versions retrieved successfully', async () => {
-      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+      const versionNames = ['v1', 'v2', 'v3'];
 
       for (const name of versionNames) {
         await request(app.getHttpServer())
           .post('/document-versions')
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ ...testDocumentVersion, name })
+          .field('documentId', testDocumentVersion.documentId)
+          .field('name', name)
+          .attach('file', testDocumentFilePath)
           .expect(201);
       }
 
@@ -669,7 +720,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
         expect(version).toMatchObject({
           documentVersionId: expect.any(Number),
           name: expect.any(String),
-          filePath: 'fakePath',
           creationDate: expect.any(String),
           documentId,
           userId,
@@ -686,13 +736,15 @@ describe('E2E - DocumentVersions Endpoints', () => {
         role: 'WRITE',
       });
 
-      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+      const versionNames = ['v1', 'v2', 'v3'];
 
       for (const name of versionNames) {
         await request(app.getHttpServer())
           .post('/document-versions')
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ ...testDocumentVersion, name })
+          .field('documentId', testDocumentVersion.documentId)
+          .field('name', name)
+          .attach('file', testDocumentFilePath)
           .expect(201);
       }
 
@@ -707,7 +759,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
         expect(version).toMatchObject({
           documentVersionId: expect.any(Number),
           name: expect.any(String),
-          filePath: 'fakePath',
           creationDate: expect.any(String),
           documentId,
           userId,
@@ -724,13 +775,15 @@ describe('E2E - DocumentVersions Endpoints', () => {
         role: 'READ',
       });
 
-      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+      const versionNames = ['v1', 'v2', 'v3'];
 
       for (const name of versionNames) {
         await request(app.getHttpServer())
           .post('/document-versions')
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ ...testDocumentVersion, name })
+          .field('documentId', testDocumentVersion.documentId)
+          .field('name', name)
+          .attach('file', testDocumentFilePath)
           .expect(201);
       }
 
@@ -745,7 +798,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
         expect(version).toMatchObject({
           documentVersionId: expect.any(Number),
           name: expect.any(String),
-          filePath: 'fakePath',
           creationDate: expect.any(String),
           documentId,
           userId,
@@ -790,13 +842,15 @@ describe('E2E - DocumentVersions Endpoints', () => {
     });
 
     it('Document Versions retrieved successfully', async () => {
-      const versionNames = ['v1.0', 'v1.1', 'v2.0'];
+      const versionNames = ['v1', 'v2', 'v3'];
 
       for (const name of versionNames) {
         await request(app.getHttpServer())
           .post('/document-versions')
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ ...testDocumentVersion, name })
+          .field('documentId', testDocumentVersion.documentId)
+          .field('name', name)
+          .attach('file', testDocumentFilePath)
           .expect(201);
       }
 
@@ -811,7 +865,6 @@ describe('E2E - DocumentVersions Endpoints', () => {
         expect(version).toMatchObject({
           documentVersionId: expect.any(Number),
           name: expect.any(String),
-          filePath: 'fakePath',
           creationDate: expect.any(String),
           documentId,
           userId,
@@ -844,6 +897,182 @@ describe('E2E - DocumentVersions Endpoints', () => {
             error: 'Forbidden',
             message: 'You can only view your own document versions',
             statusCode: 403,
+          });
+        });
+    });
+  });
+
+  describe('Download', () => {
+    it('Request without authentication', async () => {
+      return request(app.getHttpServer()).get(`/document-versions/download/1`).expect(401);
+    });
+
+    it('Document Version downloaded successfully', async () => {
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      const { headers, body } = await request(app.getHttpServer())
+        .get(`/document-versions/download/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .buffer()
+        .parse((res, callback) => {
+          res.setEncoding('binary');
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            callback(null, Buffer.from(data, 'binary'));
+          });
+        })
+        .expect(200);
+
+      expect(headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(headers['content-disposition']).toBe(`attachment; filename="version_${testDocumentVersion.name}.docx"`);
+      expect(headers['content-length']).toBe(`${body.length}`);
+      expect(body).toEqual(readFileSync(testDocumentFilePath));
+    });
+
+    it('Document Version downloaded successfully - write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      const { body, headers } = await request(app.getHttpServer())
+        .get(`/document-versions/download/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .buffer()
+        .parse((res, callback) => {
+          res.setEncoding('binary');
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            callback(null, Buffer.from(data, 'binary'));
+          });
+        })
+        .expect(200);
+
+      expect(headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(headers['content-disposition']).toBe(`attachment; filename="version_${testDocumentVersion.name}.docx"`);
+      expect(headers['content-length']).toBe(`${body.length}`);
+      expect(body).toEqual(readFileSync(testDocumentFilePath));
+    });
+
+    it('Document Version downloaded successfully - read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      const { body, headers } = await request(app.getHttpServer())
+        .get(`/document-versions/download/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .buffer()
+        .parse((res, callback) => {
+          res.setEncoding('binary');
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            callback(null, Buffer.from(data, 'binary'));
+          });
+        })
+        .expect(200);
+
+      expect(headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(headers['content-disposition']).toBe(`attachment; filename="version_${testDocumentVersion.name}.docx"`);
+      expect(headers['content-length']).toBe(`${body.length}`);
+      expect(body).toEqual(readFileSync(testDocumentFilePath));
+    });
+
+    it('Not downloaded - Document Version does not exist', async () => {
+      await request(app.getHttpServer())
+        .get(`/document-versions/download/9999`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            statusCode: 404,
+            message: 'Document Version not found',
+            error: 'Not Found',
+          });
+        });
+    });
+
+    it('Not downloaded - User not in organization', async () => {
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      await request(app.getHttpServer())
+        .get(`/document-versions/download/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have read permissions in this organization',
+            statusCode: 403,
+          });
+        });
+    });
+
+    it('Not downloaded - File is missing', async () => {
+      const { body: createBody } = await request(app.getHttpServer())
+        .post('/document-versions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .field('documentId', testDocumentVersion.documentId)
+        .field('name', testDocumentVersion.name)
+        .attach('file', testDocumentFilePath)
+        .expect(201);
+      const documentVersionId = createBody.documentVersionId;
+
+      // Remove the file
+      rmSync(savedFilePath);
+
+      await request(app.getHttpServer())
+        .get(`/document-versions/download/${documentVersionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(500)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            statusCode: 500,
+            message: 'Internal server error',
           });
         });
     });
