@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { OrganizationUser } from 'src/organizations/entities/organization-user.entity';
 import { Document } from 'src/documents/entities/document.entity';
-import { UserFavoriteOrg } from 'src/users/entities/user-favorite-org.entity';
 
 /**
  * Supported organization types:
@@ -37,8 +36,4 @@ export class Organization {
   /* ------------- The documents of this organization ------------- */
   @OneToMany(() => Document, (document) => document.organization)
   documents: Document[];
-
-  /* ------------- Users who favorited this organization ------------- */
-  @OneToMany(() => UserFavoriteOrg, (favoriteOrg) => favoriteOrg.organization)
-  favoritedBy: UserFavoriteOrg[];
 }
