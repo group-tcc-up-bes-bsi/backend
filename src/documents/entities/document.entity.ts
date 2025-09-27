@@ -26,6 +26,10 @@ export class Document {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   lastModifiedDate: Date;
 
+  // Should be updated when a new version is added
+  @Column({ default: 0 })
+  activeVersionId: number;
+
   /* ------------- This document versions ------------- */
   @OneToMany(() => DocumentVersion, (version) => version.document)
   documentVersions: DocumentVersion[];

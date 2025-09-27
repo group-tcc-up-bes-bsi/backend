@@ -76,6 +76,18 @@ export class DocumentsController {
   }
 
   /**
+   * Updates the active version ID of a document.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the document to update.
+   * @param {string} versionId - The ID of the document version to set as active.
+   * @returns {Promise<object>} - A promise that resolves to an object containing a message and the document ID.
+   */
+  @Patch(':id/active-version/:versionId')
+  updateActiveVersion(@Request() request, @Param('id') id: string, @Param('versionId') versionId: string) {
+    return this.documentsService.updateActiveVersionId(+request.user.userId, +id, +versionId);
+  }
+
+  /**
    * Deletes a document by its ID.
    * @param {Request} request - The request object containing user information.
    * @param {string} id - The ID of the document to delete.

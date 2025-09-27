@@ -144,7 +144,7 @@ export class DocumentVersionsService {
       throw new Error('Error saving file');
     }
 
-    return this.docVersionsRepo
+    const { documentVersionId } = await this.docVersionsRepo
       .save(
         this.docVersionsRepo.create({
           name: dto.name,
@@ -153,17 +153,17 @@ export class DocumentVersionsService {
           userId: requestUserId,
         }),
       )
-      .then(({ documentVersionId }) => {
-        this.logger.debug(`Document Version Id ${documentVersionId} saved successfully`);
-        return {
-          message: 'Document Version successfully created',
-          documentVersionId,
-        };
-      })
       .catch((error) => {
         this.logger.error(`Error saving document version: ${error}`);
         throw new Error('Error saving document version');
       });
+
+    this.logger.debug(`Document Version Id ${documentVersionId} saved successfully`);
+    await this.documentsService.updateLastModifiedDate(dto.documentId, documentVersionId);
+    return {
+      message: 'Document Version successfully created',
+      documentVersionId,
+    };
   }
 
   /**
