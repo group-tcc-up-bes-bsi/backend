@@ -1,4 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Organization, OrganizationType } from './entities/organization.entity';
 import { Repository } from 'typeorm';
@@ -27,6 +35,7 @@ export class OrganizationsService {
     private readonly organizationsRepo: Repository<Organization>,
     @InjectRepository(OrganizationUser)
     private readonly organizationUserRepo: Repository<OrganizationUser>,
+    @Inject(forwardRef(() => UsersService))
     private usersService: UsersService,
   ) {}
 
@@ -95,16 +104,12 @@ export class OrganizationsService {
     }
   }
 
-  ///////////////////////////////////////////////////////////////////////
-  // Private Organization functions
-  ///////////////////////////////////////////////////////////////////////
-
   /**
    * Retrieves a organization by their ID.
    * @param {number} organizationId - The ID of the organization to retrieve.
    * @returns {Promise<Organization>} - The organization entity if found.
    */
-  private async findOneOrganization(organizationId: number): Promise<Organization> {
+  async findOneOrganization(organizationId: number): Promise<Organization> {
     const organization = await this.organizationsRepo.findOne({
       where: { organizationId },
       relations: ['organizationUsers'],

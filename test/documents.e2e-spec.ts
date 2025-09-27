@@ -929,4 +929,152 @@ describe('E2E - Documents Endpoints', () => {
         .expect(404);
     });
   });
+
+  describe('User Favorite Documents', () => {
+    let documentId: number;
+
+    beforeEach(async () => {
+      documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+    });
+
+    describe('Add document to user favorites', () => {
+      afterEach(() => {
+        return request(app.getHttpServer())
+          .delete(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`);
+      });
+
+      it('Request without authentication', () => {
+        return request(app.getHttpServer()).post(`/users/favorites/documents/${documentId}`).expect(401);
+      });
+
+      it('Add document to favorites successfully', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: 'Document added to favorites',
+              documentId,
+            });
+          });
+      });
+
+      it('Add same document twice returns appropriate message', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .post(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(409)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: 'Document already in favorites',
+              statusCode: 409,
+            });
+          });
+      });
+    });
+
+    describe('Remove document from user favorites', () => {
+      it('Request without authentication', () => {
+        return request(app.getHttpServer()).delete(`/users/favorites/documents/${documentId}`).expect(401);
+      });
+
+      it('Remove document from favorites successfully', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: 'Document removed from favorites',
+              documentId,
+            });
+          });
+      });
+
+      it('Remove document not in favorites returns appropriate message', async () => {
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(404)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: `Document ${documentId} not in favorites`,
+              statusCode: 404,
+            });
+          });
+      });
+    });
+
+    describe('Get user favorited documents', () => {
+      it('Request without authentication', () => {
+        return request(app.getHttpServer()).get('/users/favorites/documents').expect(401);
+      });
+
+      it('Get favorite documents - empty list', async () => {
+        const { body } = await request(app.getHttpServer())
+          .get('/users/favorites/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(Array.isArray(body)).toBe(true);
+        expect(body).toHaveLength(0);
+      });
+
+      it('Get favorite documents - after adding', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        const { body } = await request(app.getHttpServer())
+          .get('/users/favorites/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.some((doc) => doc.documentId === documentId)).toBe(true);
+
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`);
+      });
+
+      it('Get favorite documents - after removing', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/documents/${documentId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        const { body } = await request(app.getHttpServer())
+          .get('/users/favorites/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(body.some((doc) => doc.documentId === documentId)).toBe(false);
+      });
+    });
+  });
 });

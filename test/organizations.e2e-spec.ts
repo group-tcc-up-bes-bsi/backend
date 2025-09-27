@@ -369,8 +369,6 @@ describe('E2E - Organizations Endpoints', () => {
         organizationId: testOrganizationId,
       });
     });
-
-    //write e colab -> indiv
   });
 
   describe('Delete an organization', () => {
@@ -1735,6 +1733,155 @@ describe('E2E - Organizations Endpoints', () => {
             statusCode: 403,
           }),
         );
+    });
+  });
+
+  describe('Organization added to user favorites', () => {
+    let orgId: number;
+
+    beforeEach(async () => {
+      // Cria uma organização para favoritar
+      orgId = (
+        await request(app.getHttpServer())
+          .post('/organizations')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testOrganizationColab)
+          .expect(201)
+      ).body.organizationId;
+    });
+
+    describe('Add organization to user favorites', () => {
+      afterEach(() => {
+        return request(app.getHttpServer())
+          .delete(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`);
+      });
+
+      it('Request without authentication', () => {
+        return request(app.getHttpServer()).post(`/users/favorites/organizations/${orgId}`).expect(401);
+      });
+
+      it('Add organization to favorites successfully', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: 'Organization added to favorites',
+              organizationId: orgId,
+            });
+          });
+      });
+
+      it('Add same organization twice returns appropriate message', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .post(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(409)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: 'Organization already in favorites',
+              statusCode: 409,
+            });
+          });
+      });
+    });
+
+    describe('Remove organization from user favorites', () => {
+      it('Request without authentication', () => {
+        return request(app.getHttpServer()).delete(`/users/favorites/organizations/${orgId}`).expect(401);
+      });
+
+      it('Remove organization from favorites successfully', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: 'Organization removed from favorites',
+              organizationId: orgId,
+            });
+          });
+      });
+
+      it('Remove organization not in favorites returns appropriate message', async () => {
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(404)
+          .expect(({ body }) => {
+            expect(body).toMatchObject({
+              message: `Organization ${orgId} not in favorites`,
+              statusCode: 404,
+            });
+          });
+      });
+    });
+
+    describe('Get user favorited organizations', () => {
+      it('Request without authentication', () => {
+        return request(app.getHttpServer()).get('/users/favorites/organizations').expect(401);
+      });
+
+      it('Get favorite organizations - empty list', async () => {
+        const { body } = await request(app.getHttpServer())
+          .get('/users/favorites/organizations')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(Array.isArray(body)).toBe(true);
+        expect(body).toHaveLength(0);
+      });
+
+      it('Get favorite organizations - after adding', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        const { body } = await request(app.getHttpServer())
+          .get('/users/favorites/organizations')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.some((org) => org.organizationId === orgId)).toBe(true);
+
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`);
+      });
+
+      it('Get favorite organizations - after removing', async () => {
+        await request(app.getHttpServer())
+          .post(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .delete(`/users/favorites/organizations/${orgId}`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        const { body } = await request(app.getHttpServer())
+          .get('/users/favorites/organizations')
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+
+        expect(body.some((org) => org.organizationId === orgId)).toBe(false);
+      });
     });
   });
 });

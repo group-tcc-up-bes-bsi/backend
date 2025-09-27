@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, ManyToMany } from 'typeorm';
 import { Organization } from 'src/organizations/entities/organization.entity';
 import { DocumentVersion } from 'src/document-versions/entities/document-version.entity';
+import { User } from 'src/users/entities/user.entity';
 
 /**
  * Document entity.
@@ -41,4 +42,8 @@ export class Document {
 
   @Column()
   organizationId: number;
+
+  /* ------------- Favorited By Users ------------- */
+  @ManyToMany(() => User, (user) => user.favoriteDocuments)
+  favoritedByUsers: User[];
 }

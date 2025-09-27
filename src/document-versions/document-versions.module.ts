@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { DocumentVersionsService } from './document-versions.service';
 import { DocumentVersionsController } from './document-versions.controller';
 import { DocumentVersion } from './entities/document-version.entity';
@@ -11,7 +11,12 @@ import { OrganizationsModule } from 'src/organizations/organizations.module';
  * Module for managing document versions.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([DocumentVersion]), AuthModule, DocumentsModule, OrganizationsModule],
+  imports: [
+    TypeOrmModule.forFeature([DocumentVersion]),
+    forwardRef(() => AuthModule),
+    forwardRef(() => DocumentsModule),
+    forwardRef(() => OrganizationsModule),
+  ],
   controllers: [DocumentVersionsController],
   providers: [DocumentVersionsService],
 })
