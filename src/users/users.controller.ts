@@ -35,6 +35,20 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
+   * Verifies if the user has access to the requested resource.
+   * This method checks if the user ID in the request matches the ID of the resource being accessed.
+   * @param {number} id - The ID of the resource being accessed.
+   * @param {Request} request - The request object containing user information.
+   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
+   */
+  private checkUserAccess(id: number, @Request() request) {
+    if (+request.user.userId !== id) {
+      this.logger.warn(`User with ID ${request.user.userId} tried to access user with ID ${id}`);
+      throw new ForbiddenException('You are not authorized to access this resource');
+    }
+  }
+
+  /**
    * Retrieves a user by their ID.
    * Only the user themselves can access this endpoint.
    * @param {string} id - The ID of the user to retrieve.
@@ -114,16 +128,72 @@ export class UsersController {
   }
 
   /**
-   * Verifies if the user has access to the requested resource.
-   * This method checks if the user ID in the request matches the ID of the resource being accessed.
-   * @param {number} id - The ID of the resource being accessed.
-   * @param {Request} request - The request object containing user information.
-   * @throws {ForbiddenException} - If the user is not authorized to access this resource.
+   * Adds an organization to the user's list of favorite organizations.
+   * @param {string} orgId - The ID of the organization.
+   * @param {Request} request - The request object.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
    */
-  private checkUserAccess(id: number, @Request() request) {
-    if (+request.user.userId !== id) {
-      this.logger.warn(`User with ID ${request.user.userId} tried to access user with ID ${id}`);
-      throw new ForbiddenException('You are not authorized to access this resource');
-    }
+  @UseGuards(AuthGuard)
+  @Post('/favorites/organizations/:orgId')
+  addFavoriteOrganization(@Param('orgId') orgId: string, @Request() request) {
+    return this.usersService.addFavoriteOrganization(+request.user.userId, +orgId);
+  }
+
+  /**
+   * Removes an organization from the user's list of favorite organizations.
+   * @param {string} orgId - The ID of the organization.
+   * @param {Request} request - The request object.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  @UseGuards(AuthGuard)
+  @Delete('/favorites/organizations/:orgId')
+  removeFavoriteOrganization(@Param('orgId') orgId: string, @Request() request) {
+    return this.usersService.removeFavoriteOrganization(+request.user.userId, +orgId);
+  }
+
+  /**
+   * Retrieves the list of favorite organizations for the authenticated user.
+   * @param {Request} request - The request object.
+   * @returns {Promise<[]>} - A promise that resolves to an array of favorite organizations.
+   */
+  @UseGuards(AuthGuard)
+  @Get('/favorites/organizations')
+  getFavoriteOrganizations(@Request() request) {
+    return this.usersService.getFavoriteOrganizations(+request.user.userId);
+  }
+
+  /**
+   * Adds a document to the user's list of favorite documents.
+   * @param {string} docId - The ID of the document.
+   * @param {Request} request - The request object.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  @UseGuards(AuthGuard)
+  @Post('/favorites/documents/:docId')
+  addFavoriteDocument(@Param('docId') docId: string, @Request() request) {
+    return this.usersService.addFavoriteDocument(+request.user.userId, +docId);
+  }
+
+  /**
+   * Removes a document from the user's list of favorite documents.
+   * @param {string} docId - The ID of the document.
+   * @param {Request} request - The request object.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  @UseGuards(AuthGuard)
+  @Delete('/favorites/documents/:docId')
+  removeFavoriteDocument(@Param('docId') docId: string, @Request() request) {
+    return this.usersService.removeFavoriteDocument(+request.user.userId, +docId);
+  }
+
+  /**
+   * Retrieves the list of favorited documents for the authenticated user.
+   * @param {Request} request - The request object.
+   * @returns {Promise<[]>} - A promise that resolves to an array of favorited documents.
+   */
+  @UseGuards(AuthGuard)
+  @Get('/favorites/documents')
+  getFavoriteDocuments(@Request() request) {
+    return this.usersService.getFavoriteDocuments(+request.user.userId);
   }
 }

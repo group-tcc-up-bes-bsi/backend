@@ -13,6 +13,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ConfigService } from '@nestjs/config';
 import { UpdateUserPasswordDto } from './dto/update-user-password';
+import { OrganizationsService } from 'src/organizations/organizations.service';
+import { DocumentsService } from 'src/documents/documents.service';
+import { UserType } from 'src/organizations/entities/organization-user.entity';
 
 /**
  * Service for managing users.
@@ -26,11 +29,15 @@ export class UsersService {
   /**
    * Creates an instance of UsersService.
    * @param {Repository<User>} usersRepo - The repository for user entities.
+   * @param {OrganizationsService} organizationsService - The service for managing organizations.
+   * @param {DocumentsService} documentsService - The service for managing documents.
    * @param {ConfigService} configService - The configuration service to access environment variables.
    */
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    private organizationsService: OrganizationsService,
+    private documentsService: DocumentsService,
     private readonly configService: ConfigService,
   ) {
     this.adminPassword = configService.get('ADMINPASS');
@@ -234,5 +241,173 @@ export class UsersService {
       this.logger.warn(`User with ID ${userId} not found for removal`);
       throw new NotFoundException('User not found');
     }
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  // Favorites methods
+  ///////////////////////////////////////////////////////////////////////
+
+  /**
+   * Adds an organization to the user's list of favorite organizations.
+   * @param {number} userId - The ID of the user.
+   * @param {number} organizationId - The ID of the organization to add to favorites.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  async addFavoriteOrganization(userId: number, organizationId: number): Promise<object> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+      relations: ['favoriteOrganizations'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    const organization = await this.organizationsService.findOneOrganization(organizationId);
+    if (!organization) {
+      throw new NotFoundException(`Organization ${organizationId} not found`);
+    }
+
+    const alreadyFavorite = user.favoriteOrganizations.some((org) => org.organizationId === organizationId);
+    if (alreadyFavorite) {
+      throw new ConflictException('Organization already in favorites');
+    }
+
+    await this.organizationsService.checkUserRole(userId, organizationId, [
+      UserType.OWNER,
+      UserType.WRITE,
+      UserType.READ,
+    ]);
+
+    user.favoriteOrganizations.push(organization);
+    await this.usersRepo.save(user);
+
+    this.logger.debug(`Organization ${organizationId} added to favorites of user ${userId}`);
+
+    return { message: 'Organization added to favorites', organizationId };
+  }
+
+  /**
+   * Removes an organization from the user's list of favorite organizations.
+   * @param {number} userId - The ID of the user.
+   * @param {number} organizationId - The ID of the organization to remove from favorites.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  async removeFavoriteOrganization(userId: number, organizationId: number): Promise<object> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+      relations: ['favoriteOrganizations'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    const beforeCount = user.favoriteOrganizations.length;
+    user.favoriteOrganizations = user.favoriteOrganizations.filter((org) => org.organizationId !== organizationId);
+
+    if (beforeCount === user.favoriteOrganizations.length) {
+      throw new NotFoundException(`Organization ${organizationId} not in favorites`);
+    }
+
+    await this.usersRepo.save(user);
+
+    this.logger.debug(`Organization ${organizationId} removed from favorites of user ${userId}`);
+
+    return { message: 'Organization removed from favorites', organizationId };
+  }
+
+  /**
+   * Retrieves the list of favorite organizations for a user.
+   * @param {number} userId - The ID of the user.
+   * @returns {Promise<any[]>} - A promise that resolves to an array of favorite organizations.
+   */
+  async getFavoriteOrganizations(userId: number): Promise<any[]> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+      relations: ['favoriteOrganizations'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    return user.favoriteOrganizations;
+  }
+
+  /**
+   * Adds a document to the user's list of favorite documents.
+   * @param {number} userId - The ID of the user.
+   * @param {number} documentId - The ID of the document to add to favorites.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  async addFavoriteDocument(userId: number, documentId: number): Promise<object> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+      relations: ['favoriteDocuments'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    const document = await this.documentsService.findOne(userId, documentId);
+    if (!document) {
+      throw new NotFoundException(`Document ${documentId} not found`);
+    }
+
+    const alreadyFavorite = user.favoriteDocuments.some((doc) => doc.documentId === documentId);
+    if (alreadyFavorite) {
+      throw new ConflictException('Document already in favorites');
+    }
+
+    user.favoriteDocuments.push(document);
+    await this.usersRepo.save(user);
+
+    this.logger.debug(`Document ${documentId} added to favorites of user ${userId}`);
+
+    return { message: 'Document added to favorites', documentId };
+  }
+
+  /**
+   * Removes a document from the user's list of favorite documents.
+   * @param {number} userId - The ID of the user.
+   * @param {number} documentId - The ID of the document to remove from favorites.
+   * @returns {Promise<object>} - A promise that resolves when the operation is completed.
+   */
+  async removeFavoriteDocument(userId: number, documentId: number): Promise<object> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+      relations: ['favoriteDocuments'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    const beforeCount = user.favoriteDocuments.length;
+    user.favoriteDocuments = user.favoriteDocuments.filter((doc) => doc.documentId !== documentId);
+
+    if (beforeCount === user.favoriteDocuments.length) {
+      throw new NotFoundException(`Document ${documentId} not in favorites`);
+    }
+
+    await this.usersRepo.save(user);
+
+    this.logger.debug(`Document ${documentId} removed from favorites of user ${userId}`);
+
+    return { message: 'Document removed from favorites', documentId };
+  }
+
+  /**
+   * Retrieves the list of favorite documents for a user.
+   * @param {number} userId - The ID of the user.
+   * @returns {Promise<any[]>} - A promise that resolves to an array of favorite documents.
+   */
+  async getFavoriteDocuments(userId: number): Promise<any[]> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+      relations: ['favoriteDocuments'],
+    });
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
+    return user.favoriteDocuments;
   }
 }
