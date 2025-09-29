@@ -256,6 +256,94 @@ export class DocumentsService {
   }
 
   /**
+   * Moves a document to the trash (soft delete).
+   * Only users with edit permissions can move documents to the trash.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @param {number} documentId - The ID of the document to move to trash.
+   * @returns {Promise<object>} - Object containing message and documentId.
+   */
+  async moveToTrash(requestUserId: number, documentId: number): Promise<object> {
+    await this.checkEditPermission(requestUserId, await this.getOrganizationId(documentId));
+    return this.documentsRepo
+      .softDelete(documentId)
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`Document with ID ${documentId} successfully moved to trash`);
+          return {
+            message: 'Document successfully moved to trash',
+            documentId,
+          };
+        } else {
+          this.logger.warn(`No document found with ID ${documentId} to move to trash`);
+          throw new NotFoundException('Document not found');
+        }
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error moving document ${documentId} to trash`, e.stack);
+        throw new Error('Error moving document to trash');
+      });
+  }
+
+  /**
+   * Restores a document from the trash (undo soft delete).
+   * Only users with edit permissions can restore documents from the trash.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @param {number} documentId - The ID of the document to restore from trash.
+   * @returns {Promise<object>} - Object containing message and documentId.
+   */
+  async restoreFromTrash(requestUserId: number, documentId: number): Promise<object> {
+    await this.checkEditPermission(requestUserId, await this.getOrganizationId(documentId));
+    return this.documentsRepo
+      .restore(documentId)
+      .then((result) => {
+        if (result.affected > 0) {
+          this.logger.log(`Document with ID ${documentId} successfully restored from trash`);
+          return {
+            message: 'Document successfully restored from trash',
+            documentId,
+          };
+        } else {
+          this.logger.warn(`No document found with ID ${documentId} to restore from trash`);
+          throw new NotFoundException('Document not found');
+        }
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error restoring document ${documentId} from trash`, e.stack);
+        throw new Error('Error restoring document from trash');
+      });
+  }
+
+  /**
+   * Retrieves all organization documents moved to trash.
+   * @param {number} requestUserId - The ID of the user making the request.
+   * @param {number} organizationId - Organization ID.
+   * @throws {NotFoundException} - If there is no deleted documents for this organization.
+   * @returns {Promise<[]>} - A promise that resolves to an array of deleted document objects.
+   */
+  async findAllOnTrashByOrganization(requestUserId: number, organizationId: number) {
+    await this.checkReadPermission(requestUserId, organizationId);
+
+    const deletedDocuments = await this.documentsRepo
+      .createQueryBuilder('document')
+      .withDeleted()
+      .where('document.organizationId = :organizationId', { organizationId })
+      .andWhere('document.deletedAt IS NOT NULL')
+      .getMany();
+
+    if (!deletedDocuments || deletedDocuments.length === 0) {
+      throw new NotFoundException('No deleted documents found for this organization');
+    }
+
+    return deletedDocuments;
+  }
+
+  /**
    * Retrieves all organization documents.
    * @param {number} requestUserId - The ID of the user making the request.
    * @param {number} organizationId - Organization ID.

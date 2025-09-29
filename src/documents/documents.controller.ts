@@ -88,6 +88,28 @@ export class DocumentsController {
   }
 
   /**
+   * Moves a document to the trash (soft delete).
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the document to move to trash.
+   * @returns {Promise<object>} - A promise that resolves to a success message.
+   */
+  @Patch(':id/trash')
+  moveToTrash(@Request() request, @Param('id') id: string) {
+    return this.documentsService.moveToTrash(+request.user.userId, +id);
+  }
+
+  /**
+   * Restores a document from the trash.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the document to restore from trash.
+   * @returns {Promise<object>} - A promise that resolves to a success message.
+   */
+  @Patch(':id/restore')
+  restoreFromTrash(@Request() request, @Param('id') id: string) {
+    return this.documentsService.restoreFromTrash(+request.user.userId, +id);
+  }
+
+  /**
    * Deletes a document by its ID.
    * @param {Request} request - The request object containing user information.
    * @param {string} id - The ID of the document to delete.
