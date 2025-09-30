@@ -1,4 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -68,6 +75,32 @@ export class DocumentsService {
     if (!hasPermission) {
       throw new ForbiddenException('You do not have owner permissions in this organization');
     }
+  }
+
+  /**
+   * Get Organization ID based on Document ID, using different query for trashed documents.
+   * @param {number} documentId - Document ID.
+   * @returns {number} - Organization ID.
+   */
+  private findTrashedDocument(documentId: number): Promise<Document> {
+    return this.documentsRepo
+      .createQueryBuilder('document')
+      .withDeleted()
+      .where('document.documentId = :documentId', { documentId })
+      .getOne()
+      .then((document) => {
+        if (!document) {
+          throw new NotFoundException('Document not found');
+        }
+        return document;
+      })
+      .catch((e) => {
+        if (e.name === 'NotFoundException') {
+          throw e;
+        }
+        this.logger.error(`Error retrieving document ${documentId}`, e.stack);
+        throw new Error('Error retrieving document');
+      });
   }
 
   ///////////////////////////////////////////////////////////////////////
@@ -263,7 +296,15 @@ export class DocumentsService {
    * @returns {Promise<object>} - Object containing message and documentId.
    */
   async moveToTrash(requestUserId: number, documentId: number): Promise<object> {
-    await this.checkEditPermission(requestUserId, await this.getOrganizationId(documentId));
+    const document = await this.findTrashedDocument(documentId);
+
+    await this.checkEditPermission(requestUserId, document.organizationId);
+
+    if (document.deletedAt) {
+      this.logger.warn(`Document with ID ${documentId} is already in the trash`);
+      throw new ConflictException('Document is already in the trash');
+    }
+
     return this.documentsRepo
       .softDelete(documentId)
       .then((result) => {
@@ -275,7 +316,7 @@ export class DocumentsService {
           };
         } else {
           this.logger.warn(`No document found with ID ${documentId} to move to trash`);
-          throw new NotFoundException('Document not found');
+          throw new NotFoundException('Document not found or already on trash');
         }
       })
       .catch((e) => {
@@ -295,7 +336,15 @@ export class DocumentsService {
    * @returns {Promise<object>} - Object containing message and documentId.
    */
   async restoreFromTrash(requestUserId: number, documentId: number): Promise<object> {
-    await this.checkEditPermission(requestUserId, await this.getOrganizationId(documentId));
+    const document = await this.findTrashedDocument(documentId);
+
+    await this.checkEditPermission(requestUserId, document.organizationId);
+
+    if (!document.deletedAt) {
+      this.logger.warn(`Document with ID ${documentId} is not in the trash`);
+      throw new ConflictException('Document is not in the trash');
+    }
+
     return this.documentsRepo
       .restore(documentId)
       .then((result) => {
@@ -326,21 +375,21 @@ export class DocumentsService {
    * @throws {NotFoundException} - If there is no deleted documents for this organization.
    * @returns {Promise<[]>} - A promise that resolves to an array of deleted document objects.
    */
-  async findAllOnTrashByOrganization(requestUserId: number, organizationId: number) {
+  async findAllTrashedByOrganization(requestUserId: number, organizationId: number) {
     await this.checkReadPermission(requestUserId, organizationId);
 
-    const deletedDocuments = await this.documentsRepo
+    const trashedDocuments = await this.documentsRepo
       .createQueryBuilder('document')
       .withDeleted()
       .where('document.organizationId = :organizationId', { organizationId })
       .andWhere('document.deletedAt IS NOT NULL')
       .getMany();
 
-    if (!deletedDocuments || deletedDocuments.length === 0) {
-      throw new NotFoundException('No deleted documents found for this organization');
+    if (!trashedDocuments || trashedDocuments.length === 0) {
+      throw new NotFoundException('No trashed documents found for this organization');
     }
 
-    return deletedDocuments;
+    return trashedDocuments;
   }
 
   /**
