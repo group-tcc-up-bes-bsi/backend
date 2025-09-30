@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, ManyToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  ManyToMany,
+  DeleteDateColumn,
+} from 'typeorm';
 import { Organization } from 'src/organizations/entities/organization.entity';
 import { DocumentVersion } from 'src/document-versions/entities/document-version.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -30,6 +39,10 @@ export class Document {
   // Should be updated when a new version is added
   @Column({ default: 0 })
   activeVersionId: number;
+
+  // Updated when the document is moved to the trash or restored
+  @DeleteDateColumn()
+  deletedAt?: Date;
 
   /* ------------- This document versions ------------- */
   @OneToMany(() => DocumentVersion, (version) => version.document)

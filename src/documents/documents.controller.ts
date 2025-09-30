@@ -52,6 +52,17 @@ export class DocumentsController {
   }
 
   /**
+   * Retrieves all trashed (soft-deleted) documents by organization ID.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the organization to retrieve trashed documents for.
+   * @returns {Promise<[]>} - A promise that resolves to an array of trashed documents.
+   */
+  @Get('organization/:id/trashed')
+  findAllTrashedByOrganization(@Request() request, @Param('id') id: string) {
+    return this.documentsService.findAllTrashedByOrganization(+request.user.userId, +id);
+  }
+
+  /**
    * Creates a new document.
    * @param {Request} request - The request object containing user information.
    * @param {CreateDocumentDto} dto - The data transfer object containing document details.
@@ -85,6 +96,28 @@ export class DocumentsController {
   @Patch(':id/active-version/:versionId')
   updateActiveVersion(@Request() request, @Param('id') id: string, @Param('versionId') versionId: string) {
     return this.documentsService.updateActiveVersionId(+request.user.userId, +id, +versionId);
+  }
+
+  /**
+   * Moves a document to the trash (soft delete).
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the document to move to trash.
+   * @returns {Promise<object>} - A promise that resolves to a success message.
+   */
+  @Patch(':id/trash')
+  moveToTrash(@Request() request, @Param('id') id: string) {
+    return this.documentsService.moveToTrash(+request.user.userId, +id);
+  }
+
+  /**
+   * Restores a document from the trash.
+   * @param {Request} request - The request object containing user information.
+   * @param {string} id - The ID of the document to restore from trash.
+   * @returns {Promise<object>} - A promise that resolves to a success message.
+   */
+  @Patch(':id/restore')
+  restoreFromTrash(@Request() request, @Param('id') id: string) {
+    return this.documentsService.restoreFromTrash(+request.user.userId, +id);
   }
 
   /**

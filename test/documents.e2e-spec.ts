@@ -1077,4 +1077,605 @@ describe('E2E - Documents Endpoints', () => {
       });
     });
   });
+
+  describe('Document moved to trash', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch('/documents/1/trash').send(testDocument).expect(401);
+    });
+
+    it('Document moved to trash successfully', async () => {
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully moved to trash',
+            documentId,
+          }),
+        );
+
+      // This query must return null because the document is soft deleted.
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      expect(
+        await db
+          .getRepository(Document)
+          .createQueryBuilder('document')
+          .withDeleted()
+          .where('document.documentId = :documentId', { documentId })
+          .andWhere('document.deletedAt IS NOT NULL')
+          .getOne(),
+      ).toMatchObject({
+        ...testDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+        deletedAt: expect.any(Date),
+      });
+    });
+
+    it('Document moved to trash successfully - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully moved to trash',
+            documentId,
+          }),
+        );
+
+      // This query must return null because the document is soft deleted.
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      expect(
+        await db
+          .getRepository(Document)
+          .createQueryBuilder('document')
+          .withDeleted()
+          .where('document.documentId = :documentId', { documentId })
+          .andWhere('document.deletedAt IS NOT NULL')
+          .getOne(),
+      ).toMatchObject({
+        ...testDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+        deletedAt: expect.any(Date),
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not moved to trash - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeDefined();
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not moved to trash - user is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeDefined();
+    });
+
+    it('Document not found', () => {
+      return request(app.getHttpServer())
+        .patch('/documents/999/trash')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Not Found',
+            message: 'Document not found',
+            statusCode: 404,
+          });
+        });
+    });
+
+    it('Document already on trash', async () => {
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(409)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'Document is already in the trash',
+          });
+        });
+    });
+  });
+
+  describe('Document restored from trash', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).patch('/documents/1/restore').send(testDocument).expect(401);
+    });
+
+    it('Document restored from trash successfully', async () => {
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/restore`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully restored from trash',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...testDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+        deletedAt: null,
+      });
+    });
+
+    it('Document restored from trash successfully - user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/restore`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully restored from trash',
+            documentId,
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toMatchObject({
+        ...testDocument,
+        documentId,
+        creationDate: expect.any(Date),
+        lastModifiedDate: expect.any(Date),
+        deletedAt: null,
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not restored from trash - user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/restore`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Document not restored from trash - user is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/restore`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You do not have edit permissions in this organization',
+          }),
+        );
+
+      expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+    });
+
+    it('Document not found', () => {
+      return request(app.getHttpServer())
+        .patch('/documents/999/restore')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Not Found',
+            message: 'Document not found',
+            statusCode: 404,
+          });
+        });
+    });
+
+    it('Document not restored - document is not in trash', async () => {
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/restore`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(409)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'Document is not in the trash',
+          });
+        });
+    });
+  });
+
+  describe('Get documents in trash', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).get('/documents/organization/1/trashed').expect(401);
+    });
+
+    it('Get trashed documents successfully', async () => {
+      const documentIdArr = [];
+
+      // Add 3 documents to trash
+      for (let i = 0; i < 3; i++) {
+        const documentId = (
+          await request(app.getHttpServer())
+            .post('/documents')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(testDocument)
+            .expect(201)
+        ).body.documentId;
+
+        documentIdArr.push(documentId);
+
+        await request(app.getHttpServer())
+          .patch(`/documents/${documentId}/trash`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+      }
+
+      // Add 1 document that is not in trash
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+      documentIdArr.push(documentId);
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}/trashed`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(3);
+      body.forEach((doc) => {
+        expect(documentIdArr.includes(doc.documentId)).toBe(true);
+        expect(doc).toMatchObject({
+          ...testDocument,
+          creationDate: expect.any(String),
+          lastModifiedDate: expect.any(String),
+          deletedAt: expect.any(String),
+        });
+      });
+    });
+
+    it('Get trashed documents successfully - other user with write permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const documentIdArr = [];
+
+      // Add 3 documents to trash
+      for (let i = 0; i < 3; i++) {
+        const documentId = (
+          await request(app.getHttpServer())
+            .post('/documents')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(testDocument)
+            .expect(201)
+        ).body.documentId;
+
+        documentIdArr.push(documentId);
+
+        await request(app.getHttpServer())
+          .patch(`/documents/${documentId}/trash`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+      }
+
+      // Add 1 document that is not in trash
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+      documentIdArr.push(documentId);
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}/trashed`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200);
+
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(3);
+      body.forEach((doc) => {
+        expect(documentIdArr.includes(doc.documentId)).toBe(true);
+        expect(doc).toMatchObject({
+          ...testDocument,
+          creationDate: expect.any(String),
+          lastModifiedDate: expect.any(String),
+          deletedAt: expect.any(String),
+        });
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get trashed documents successfully - other user with read permissions', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const documentIdArr = [];
+
+      // Add 3 documents to trash
+      for (let i = 0; i < 3; i++) {
+        const documentId = (
+          await request(app.getHttpServer())
+            .post('/documents')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(testDocument)
+            .expect(201)
+        ).body.documentId;
+
+        documentIdArr.push(documentId);
+
+        await request(app.getHttpServer())
+          .patch(`/documents/${documentId}/trash`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .expect(200);
+      }
+
+      // Add 1 document that is not in trash
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+      documentIdArr.push(documentId);
+
+      const { body } = await request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}/trashed`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(200);
+
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(3);
+      body.forEach((doc) => {
+        expect(documentIdArr.includes(doc.documentId)).toBe(true);
+        expect(doc).toMatchObject({
+          ...testDocument,
+          creationDate: expect.any(String),
+          lastModifiedDate: expect.any(String),
+          deletedAt: expect.any(String),
+        });
+      });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('Get trashed documents - user is not part of the organization', async () => {
+      return request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}/trashed`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'You are not part of the organization',
+          }),
+        );
+    });
+
+    it('No trashed documents', async () => {
+      // Add document that is not in trash
+      await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      return request(app.getHttpServer())
+        .get(`/documents/organization/${organizationId}/trashed`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            message: 'No trashed documents found for this organization',
+          });
+        });
+    });
+
+    it('Organization not found', () => {
+      return request(app.getHttpServer())
+        .get('/documents/organization/999/trashed')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You are not part of the organization',
+            statusCode: 403,
+          });
+        });
+    });
+  });
 });
