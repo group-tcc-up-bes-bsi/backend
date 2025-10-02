@@ -1266,6 +1266,48 @@ describe('E2E - Documents Endpoints', () => {
           });
         });
     });
+
+    it('Delete trashed document', async () => {
+      const documentId = (
+        await request(app.getHttpServer())
+          .post('/documents')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(testDocument)
+          .expect(201)
+      ).body.documentId;
+
+      await request(app.getHttpServer())
+        .patch(`/documents/${documentId}/trash`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully moved to trash',
+            documentId,
+          }),
+        );
+
+      await request(app.getHttpServer())
+        .delete(`/documents/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toMatchObject({
+            message: 'Document successfully removed',
+            documentId,
+          }),
+        );
+
+      expect(
+        await db
+          .getRepository(Document)
+          .createQueryBuilder('document')
+          .withDeleted()
+          .where('document.documentId = :documentId', { documentId })
+          .andWhere('document.deletedAt IS NOT NULL')
+          .getOne(),
+      ).toBeNull();
+    });
   });
 
   describe('Document restored from trash', () => {
