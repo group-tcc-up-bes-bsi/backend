@@ -266,8 +266,9 @@ export class DocumentsService {
    * @throws {Error} - If an error occurs during the removal process.
    */
   async remove(requestUserId: number, documentId: number) {
-    await this.checkOwnerPermission(requestUserId, await this.getOrganizationId(documentId));
-    const document = await this.documentsRepo.findOneBy({ documentId });
+    const document = await this.findTrashedDocument(documentId);
+    await this.checkOwnerPermission(requestUserId, document.organizationId);
+
     if (document) {
       return this.documentsRepo
         .remove(document)
