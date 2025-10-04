@@ -9,19 +9,23 @@ const config: Config = {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverage: true,
+  collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/**/*.spec.ts'],
   coverageDirectory: './coverage',
-  testRegex: '.*\\.spec\\.ts$',
+  testRegex: '.e2e-spec.ts$',
   moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths ?? {}, {
-    prefix: '<rootDir>/',
+    prefix: '<rootDir>',
   }),
+  rootDir: './',
+  globalSetup: './test/jest-global-setup.ts',
+  globalTeardown: './test/jest-global-teardown.ts',
   reporters: [
     'default',
     [
       'jest-html-reporter',
       {
-        pageTitle: 'DocDash BackEnd - Unit Tests',
-        outputPath: './tests-unit-report.html',
+        pageTitle: 'DocDash BackEnd - E2E Tests',
+        outputPath: './tests-e2e-report.html',
       },
     ],
   ],
