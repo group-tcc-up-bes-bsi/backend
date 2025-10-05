@@ -13,6 +13,7 @@ import { Document } from './entities/document.entity';
 import { Repository } from 'typeorm';
 import { OrganizationsService } from 'src/organizations/organizations.service';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
 
 /**
  * Service for managing documents.
@@ -25,11 +26,13 @@ export class DocumentsService {
    * Creates an instance of DocumentsService.
    * @param {Repository<Document>} documentsRepo - The repository for document entities.
    * @param {OrganizationsService} organizationsService - The service for managing users.
+   * @param {AuditLogsService} auditLogService - The service for managing Audit logs.
    */
   constructor(
     @InjectRepository(Document)
     private readonly documentsRepo: Repository<Document>,
     private organizationsService: OrganizationsService,
+    private auditLogService: AuditLogsService,
   ) {}
 
   ///////////////////////////////////////////////////////////////////////
@@ -144,6 +147,7 @@ export class DocumentsService {
       .save(this.documentsRepo.create(dto))
       .then(({ documentId }) => {
         this.logger.debug(`Document Id ${documentId} saved successfully`);
+        this.auditLogService.createAuditLog('CREATED', requestUserId, documentId);
         return {
           message: 'Document successfully created',
           documentId,
@@ -178,6 +182,7 @@ export class DocumentsService {
       .then((result) => {
         if (result.affected > 0) {
           this.logger.log(`Document with ID ${documentId} successfully updated`);
+          this.auditLogService.createAuditLog('UPDATED', requestUserId, documentId);
           return {
             message: 'Document successfully updated',
             documentId,
@@ -274,6 +279,7 @@ export class DocumentsService {
         .remove(document)
         .then(() => {
           this.logger.log(`Document with ID ${documentId} successfully removed`);
+          this.auditLogService.createAuditLog('DELETED', requestUserId, documentId);
           return {
             message: 'Document successfully removed',
             documentId,
@@ -311,6 +317,7 @@ export class DocumentsService {
       .then((result) => {
         if (result.affected > 0) {
           this.logger.log(`Document with ID ${documentId} successfully moved to trash`);
+          this.auditLogService.createAuditLog('TRASHED', requestUserId, documentId);
           return {
             message: 'Document successfully moved to trash',
             documentId,
@@ -351,6 +358,7 @@ export class DocumentsService {
       .then((result) => {
         if (result.affected > 0) {
           this.logger.log(`Document with ID ${documentId} successfully restored from trash`);
+          this.auditLogService.createAuditLog('RESTORED', requestUserId, documentId);
           return {
             message: 'Document successfully restored from trash',
             documentId,

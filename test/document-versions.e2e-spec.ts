@@ -46,6 +46,12 @@ const testDocumentVersion = {
 
 const testDocumentFilePath = path.join(__dirname, './test_files/lorem.docx');
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 //////////////////////////////////////////////////////////////////////
 // Testcases
 ///////////////////////////////////////////////////////////////////////
@@ -148,6 +154,24 @@ describe('E2E - DocumentVersions Endpoints', () => {
 
       // Check if file was saved correctly
       expect(readFileSync(savedFilePath)).toEqual(readFileSync(testDocumentFilePath));
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'CREATED_VERSION');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'CREATED_VERSION',
+            message: `Document ${documentId} was CREATED_VERSION by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Document Version created successfully - write permissions', async () => {
@@ -343,6 +367,24 @@ describe('E2E - DocumentVersions Endpoints', () => {
         creationDate: expect.any(Date),
         userId,
       });
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'UPDATED_VERSION');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'UPDATED_VERSION',
+            message: `Document ${documentId} was UPDATED_VERSION by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Document Version updated successfully - write permissions', async () => {
@@ -487,6 +529,24 @@ describe('E2E - DocumentVersions Endpoints', () => {
         });
 
       expect(await db.getRepository(DocumentVersion).findOneBy({ documentVersionId })).toBeNull();
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'DELETED_VERSION');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'DELETED_VERSION',
+            message: `Document ${documentId} was DELETED_VERSION by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Not removed - Document Version does not exist', async () => {

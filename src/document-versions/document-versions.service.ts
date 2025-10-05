@@ -12,6 +12,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { ConfigService } from '@nestjs/config';
 import * as mime from 'mime-types';
 import { basename, extname } from 'path';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
 
 interface DownloadedFile {
   buffer: Buffer;
@@ -32,6 +33,7 @@ export class DocumentVersionsService {
    * @param {Repository<DocumentVersion>} docVersionsRepo - The repository for document version entities.
    * @param {OrganizationsService} organizationsService - The service for managing organizations.
    * @param {DocumentsService} documentsService - The service for managing documents.
+   * @param {AuditLogsService} auditLogService - The service for managing Audit logs.
    * @param {ConfigService} configService - The configuration service to access environment variables.
    */
   constructor(
@@ -39,6 +41,7 @@ export class DocumentVersionsService {
     private readonly docVersionsRepo: Repository<DocumentVersion>,
     private organizationsService: OrganizationsService,
     private documentsService: DocumentsService,
+    private auditLogService: AuditLogsService,
     private readonly configService: ConfigService,
   ) {
     this.fileSavePath = configService.get('FILE_SAVE_PATH');
@@ -160,6 +163,7 @@ export class DocumentVersionsService {
 
     this.logger.debug(`Document Version Id ${documentVersionId} saved successfully`);
     await this.documentsService.updateLastModifiedDate(dto.documentId, documentVersionId);
+    this.auditLogService.createAuditLog('CREATED_VERSION', requestUserId, dto.documentId);
     return {
       message: 'Document Version successfully created',
       documentVersionId,
@@ -291,6 +295,7 @@ export class DocumentVersionsService {
       .then((result) => {
         if (result.affected > 0) {
           this.logger.log(`Document with ID ${documentVersionId} successfully updated`);
+          this.auditLogService.createAuditLog('UPDATED_VERSION', requestUserId, docVersion.documentId);
           return {
             message: 'Document Version successfully updated',
             documentVersionId,
@@ -317,6 +322,7 @@ export class DocumentVersionsService {
         .remove(docVersion)
         .then(() => {
           this.logger.log(`Document version with ID ${documentVersionId} successfully removed`);
+          this.auditLogService.createAuditLog('DELETED_VERSION', requestUserId, docVersion.documentId);
           return {
             message: 'Document Version successfully removed',
             documentVersionId,

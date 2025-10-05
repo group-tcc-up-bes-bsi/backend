@@ -6,6 +6,7 @@ import { Document } from './entities/document.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { OrganizationsModule } from 'src/organizations/organizations.module';
 import { UsersModule } from 'src/users/users.module';
+import { AuditLogsModule } from 'src/audit-logs/audit-logs.module';
 
 /**
  * Module for managing documents.
@@ -16,6 +17,7 @@ import { UsersModule } from 'src/users/users.module';
     forwardRef(() => AuthModule),
     forwardRef(() => OrganizationsModule),
     forwardRef(() => UsersModule),
+    forwardRef(() => AuditLogsModule),
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],
