@@ -6,6 +6,7 @@ import { AuthModule } from 'src/auth/auth.module';
 import { DocumentsModule } from 'src/documents/documents.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrganizationsModule } from 'src/organizations/organizations.module';
+import { AuditLogsModule } from 'src/audit-logs/audit-logs.module';
 
 /**
  * Module for managing document versions.
@@ -16,6 +17,7 @@ import { OrganizationsModule } from 'src/organizations/organizations.module';
     forwardRef(() => AuthModule),
     forwardRef(() => DocumentsModule),
     forwardRef(() => OrganizationsModule),
+    forwardRef(() => AuditLogsModule),
   ],
   controllers: [DocumentVersionsController],
   providers: [DocumentVersionsService],

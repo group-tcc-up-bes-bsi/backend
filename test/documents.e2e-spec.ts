@@ -35,6 +35,12 @@ const testDocument = {
   organizationId: null,
 };
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 //////////////////////////////////////////////////////////////////////
 // Testcases
 ///////////////////////////////////////////////////////////////////////
@@ -45,6 +51,7 @@ describe('E2E - Documents Endpoints', () => {
   let organizationId: number;
   let authToken: string;
   let authToken2: string;
+  let userId: number;
   let userId2: number;
 
   beforeAll(async () => {
@@ -58,7 +65,7 @@ describe('E2E - Documents Endpoints', () => {
     db = app.get(DataSource);
     await flushDatabase(db);
 
-    await saveTestUser(db, testUser);
+    userId = await saveTestUser(db, testUser);
     authToken = await epUtils.makeTestLogin(app, testUser);
     organizationId = await epUtils.createTestOrganization(app, authToken, testOrganization);
     testDocument.organizationId = organizationId;
@@ -87,6 +94,8 @@ describe('E2E - Documents Endpoints', () => {
         .send(testDocument)
         .expect(201);
 
+      const documentId = body.documentId;
+
       expect(body).toMatchObject({
         message: 'Document successfully created',
         documentId: expect.any(Number),
@@ -94,16 +103,34 @@ describe('E2E - Documents Endpoints', () => {
 
       expect(
         await db.getRepository(Document).findOne({
-          where: { documentId: body.documentId },
+          where: { documentId },
           relations: ['organization'],
         }),
       ).toMatchObject({
         ...testDocument,
-        documentId: body.documentId,
+        documentId,
         creationDate: expect.any(Date),
         lastModifiedDate: expect.any(Date),
         organization: testOrganization,
       });
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'CREATED');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId: documentId,
+            action: 'CREATED',
+            message: `Document ${documentId} was CREATED by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Missing fields', async () => {
@@ -473,6 +500,24 @@ describe('E2E - Documents Endpoints', () => {
         creationDate: expect.any(Date),
         lastModifiedDate: expect.any(Date),
       });
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'UPDATED');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'UPDATED',
+            message: `Document ${documentId} was UPDATED by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Document updated successfully - only 1 field', async () => {
@@ -800,6 +845,24 @@ describe('E2E - Documents Endpoints', () => {
         );
 
       expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'DELETED');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'DELETED',
+            message: `Document ${documentId} was DELETED by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Document deleted successfully - other user with owner permissions', async () => {
@@ -1121,6 +1184,24 @@ describe('E2E - Documents Endpoints', () => {
         lastModifiedDate: expect.any(Date),
         deletedAt: expect.any(Date),
       });
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'TRASHED');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'TRASHED',
+            message: `Document ${documentId} was TRASHED by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Document moved to trash successfully - other user with write permissions', async () => {
@@ -1349,6 +1430,24 @@ describe('E2E - Documents Endpoints', () => {
         lastModifiedDate: expect.any(Date),
         deletedAt: null,
       });
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect(({ body }) => {
+          const auditLog = body.find((auditLog) => auditLog.action === 'RESTORED');
+          expect(auditLog).toMatchObject({
+            auditLogId: expect.any(Number),
+            userId,
+            documentId,
+            action: 'RESTORED',
+            message: `Document ${documentId} was RESTORED by User ${userId}`,
+            timestamp: expect.any(String),
+          });
+        });
     });
 
     it('Document restored from trash successfully - user with write permissions', async () => {
@@ -1718,6 +1817,106 @@ describe('E2E - Documents Endpoints', () => {
             statusCode: 403,
           });
         });
+    });
+  });
+
+  describe('Audit logs', () => {
+    it('Request without authentication', () => {
+      return request(app.getHttpServer()).get('/audit-logs/document/1').expect(401);
+    });
+
+    it('User requesting is not part of the organization', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have permissions to see the Audit logs',
+            statusCode: 403,
+          });
+        });
+    });
+
+    it('User requesting is doesnt have permissions - WRITE', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'WRITE',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have permissions to see the Audit logs',
+            statusCode: 403,
+          });
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
+    });
+
+    it('User requesting is doesnt have permissions - READ', async () => {
+      await epUtils.addToTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+        role: 'READ',
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .post('/documents')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(testDocument)
+        .expect(201);
+
+      const documentId = body.documentId;
+
+      // Audit log
+      await sleep(200);
+      await request(app.getHttpServer())
+        .get(`/audit-logs/document/${documentId}`)
+        .set('Authorization', `Bearer ${authToken2}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body).toMatchObject({
+            error: 'Forbidden',
+            message: 'You do not have permissions to see the Audit logs',
+            statusCode: 403,
+          });
+        });
+
+      await epUtils.removeFromTestOrganization(app, authToken, {
+        userId: userId2,
+        organizationId,
+      });
     });
   });
 });
