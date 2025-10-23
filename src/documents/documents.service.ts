@@ -117,7 +117,10 @@ export class DocumentsService {
    */
   getOrganizationId(documentId: number): Promise<number> {
     return this.documentsRepo
-      .findOneBy({ documentId })
+      .createQueryBuilder('document')
+      .withDeleted()
+      .where('document.documentId = :documentId', { documentId })
+      .getOne()
       .then((document) => {
         if (!document) {
           throw new NotFoundException('Document not found');

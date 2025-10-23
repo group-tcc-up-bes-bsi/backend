@@ -1,9 +1,10 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from './entities/audit-log.entity';
 import { OrganizationsService } from 'src/organizations/organizations.service';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
+import { DocumentsService } from 'src/documents/documents.service';
 
 type Action =
   | 'CREATED'
@@ -26,20 +27,24 @@ export class AuditLogsService {
    * Constructor for AuditLogsService.
    * @param {Repository<AuditLog>} auditLogsRepo - AuditLog repository.
    * @param {OrganizationsService} organizationsService - Organizations service.
+   * @param {DocumentsService} documentsService - Documents service.
    */
   constructor(
     @InjectRepository(AuditLog)
     private readonly auditLogsRepo: Repository<AuditLog>,
     private organizationsService: OrganizationsService,
+    @Inject(forwardRef(() => DocumentsService))
+    private documentsService: DocumentsService,
   ) {}
 
   /**
    * Check if user has owner permission in the organization.
    * @param {number} userId - User ID.
-   * @param {number} organizationId - Organization ID.
+   * @param {number} documentId - Document ID.
    * @throws {ForbiddenException} - If the user is not Owner.
    */
-  private async checkOwnerPermission(userId: number, organizationId: number): Promise<void> {
+  private async checkOwnerPermission(userId: number, documentId: number): Promise<void> {
+    const organizationId = await this.documentsService.getOrganizationId(documentId);
     const hasPermission = await this.organizationsService.checkUserRole(userId, organizationId, [UserType.OWNER]);
     if (!hasPermission) {
       throw new ForbiddenException('You do not have permissions to see the Audit logs');

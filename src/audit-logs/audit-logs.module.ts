@@ -5,12 +5,18 @@ import { AuditLog } from './entities/audit-log.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrganizationsModule } from 'src/organizations/organizations.module';
+import { DocumentsModule } from 'src/documents/documents.module';
 
 /**
  * Audit Logs module.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([AuditLog]), forwardRef(() => AuthModule), forwardRef(() => OrganizationsModule)],
+  imports: [
+    TypeOrmModule.forFeature([AuditLog]),
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => DocumentsModule),
+  ],
   controllers: [AuditLogsController],
   providers: [AuditLogsService],
   exports: [AuditLogsService],
