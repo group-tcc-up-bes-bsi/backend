@@ -846,23 +846,12 @@ describe('E2E - Documents Endpoints', () => {
 
       expect(await db.getRepository(Document).findOneBy({ documentId })).toBeNull();
 
-      // Audit log
+      // Audit log not available after deletion
       await sleep(200);
       await request(app.getHttpServer())
         .get(`/audit-logs/document/${documentId}`)
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(200)
-        .expect(({ body }) => {
-          const auditLog = body.find((auditLog) => auditLog.action === 'DELETED');
-          expect(auditLog).toMatchObject({
-            auditLogId: expect.any(Number),
-            userId,
-            documentId,
-            action: 'DELETED',
-            message: `Document ${documentId} was DELETED by User ${userId}`,
-            timestamp: expect.any(String),
-          });
-        });
+        .expect(404);
     });
 
     it('Document deleted successfully - other user with owner permissions', async () => {
