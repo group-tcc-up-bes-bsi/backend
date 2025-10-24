@@ -73,6 +73,21 @@ export class UsersService {
   }
 
   /**
+   * Finds a username by user ID.
+   * @param {number} userId - The ID of the user.
+   * @returns {Promise<string>} - A promise that resolves to the username if found.
+   */
+  async findUsernameById(userId: number): Promise<object> {
+    const user = await this.usersRepo.findOne({
+      where: { userId },
+    });
+    if (!user) {
+      throw new NotFoundException('User with this username not found');
+    }
+    return { userId, username: user.username };
+  }
+
+  /**
    * Retrieves a user by their ID.
    * @param {number} userId - The ID of the user to retrieve.
    * @returns {Promise<User>} - A promise that resolves to the user entity if found.

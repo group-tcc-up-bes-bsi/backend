@@ -75,6 +75,17 @@ export class UsersController {
   }
 
   /**
+   * Retrieves a username by user ID.
+   * @param {string} id - The ID of the user.
+   * @returns {Promise<object>} - A promise that resolves to the username.
+   */
+  @UseGuards(AuthGuard)
+  @Get('username/:id')
+  findUsernameById(@Param('id') id: string): Promise<object> {
+    return this.usersService.findUsernameById(+id);
+  }
+
+  /**
    * Creates a new user.
    * @param {CreateUserDto} dto - The data transfer object containing user information.
    * @returns {Promise<object>} - A promise that resolves to the created user object.
