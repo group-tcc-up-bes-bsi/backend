@@ -44,7 +44,7 @@ export class DocumentVersionsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB of file size limit
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB of file size limit
     }),
   )
   @Post()
