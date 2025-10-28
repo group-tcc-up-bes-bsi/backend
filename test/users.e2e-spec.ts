@@ -77,16 +77,26 @@ describe('E2E - Users Endpoints', () => {
         });
     });
 
-    // FIXME Testcase need check
-    it.skip('User already exists', async () => {
-      return request(app.getHttpServer())
+    it('User already exists', async () => {
+      await request(app.getHttpServer())
         .post('/users')
-        .send(testUser)
+        .send(testUser2)
+        .expect(201)
+        .expect((res) => {
+          expect(res.body).toMatchObject({
+            userId: expect.any(Number),
+            message: 'User created successfully',
+          });
+        });
+
+      await request(app.getHttpServer())
+        .post('/users')
+        .send(testUser2)
         .expect(409)
         .expect((res) => {
           expect(res.body).toMatchObject({
             statusCode: 409,
-            message: 'Username already exists',
+            message: 'User already exists',
             error: 'Conflict',
           });
         });
