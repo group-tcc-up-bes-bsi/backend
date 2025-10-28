@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UserType } from 'src/organizations/entities/organization-user.entity';
 import { DocumentsService } from 'src/documents/documents.service';
 import { File } from 'multer';
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { ConfigService } from '@nestjs/config';
 import * as mime from 'mime-types';
 import { basename, extname } from 'path';
@@ -318,6 +318,13 @@ export class DocumentVersionsService {
     const docVersion = await this.docVersionsRepo.findOneBy({ documentVersionId });
     if (docVersion) {
       await this.checkOwnerPermission(requestUserId, docVersion.documentId);
+
+      try {
+        await rmSync(docVersion.filePath, { force: true });
+      } catch (error) {
+        this.logger.error(`Error deleting file for document version ID ${documentVersionId}: ${error}`);
+      }
+
       return this.docVersionsRepo
         .remove(docVersion)
         .then(() => {
